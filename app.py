@@ -61,7 +61,8 @@ def get_required_user_em(request: Request) -> ExcelManager:
             status_code=401,
             detail="Silakan login terlebih dahulu untuk mengakses data keuangan Anda."
         )
-    return ExcelManager(user_id=user["id"])
+    canonical_id = config.canonical_user_id(user["id"])
+    return ExcelManager(user_id=canonical_id)
 
 def get_user_excel_manager(request: Request) -> ExcelManager:
     return get_required_user_em(request)
@@ -72,6 +73,7 @@ from multi_bot_manager import bot_manager
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     config.reload_config()
+    config.migrate_legacy_user_directories()
     print("🤖 [MultiBotManager] Memulai bot telegram semua pengguna di background...")
     await bot_manager.start_all_bots()
     

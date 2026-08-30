@@ -23,10 +23,11 @@ def canonical_user_id(user_identifier: str) -> str:
     """Normalize username or email to standard canonical user ID."""
     raw = str(user_identifier).strip().lower()
     if not raw:
-        return "default_user"
+        return "mghazalinurrahman939@gmail.com"
+    # Map numeric Google Sub IDs (e.g. 101040878545257435492) or primary usernames to canonical email
+    if raw.isdigit() or raw in ["mghazalinurrahman939", "admin", "mghazali", "default_user"]:
+        return "mghazalinurrahman939@gmail.com"
     if "@" not in raw:
-        if raw in ["mghazalinurrahman939", "admin", "mghazali"]:
-            return "mghazalinurrahman939@gmail.com"
         return f"{raw}@gmail.com"
     return raw
 
@@ -45,6 +46,64 @@ def get_user_excel_path(user_id: str) -> str:
     user_folder = USERS_DATA_DIR / safe_uid
     os.makedirs(user_folder, exist_ok=True)
     return str(user_folder / "MoneyTracking.xlsx")
+
+def migrate_legacy_user_directories():
+    """Migrate and merge any numeric or legacy user Excel files into canonical user data."""
+    try:
+        if not USERS_DATA_DIR.exists():
+            return
+
+        canonical_target = USERS_DATA_DIR / "mghazalinurrahman939_gmail.com" / "MoneyTracking.xlsx"
+        import openpyxl
+
+        for folder in USERS_DATA_DIR.iterdir():
+            if folder.is_dir() and folder.name != "mghazalinurrahman939_gmail.com":
+                legacy_file = folder / "MoneyTracking.xlsx"
+                if legacy_file.exists():
+                    try:
+                        wb_src = openpyxl.load_workbook(legacy_file, data_only=True)
+                        src_trxs = list(wb_src["Transaksi"].iter_rows(values_only=True))[1:] if "Transaksi" in wb_src.sheetnames else []
+                        src_inst = list(wb_src["Cicilan"].iter_rows(values_only=True))[1:] if "Cicilan" in wb_src.sheetnames else []
+                        src_assets = list(wb_src["Aset_Investasi"].iter_rows(values_only=True))[1:] if "Aset_Investasi" in wb_src.sheetnames else []
+                        wb_src.close()
+
+                        if src_trxs or src_inst or src_assets:
+                            os.makedirs(canonical_target.parent, exist_ok=True)
+                            if not canonical_target.exists():
+                                shutil.copy2(legacy_file, canonical_target)
+                            else:
+                                wb_dst = openpyxl.load_workbook(canonical_target)
+                                if "Transaksi" in wb_dst.sheetnames:
+                                    ws_t = wb_dst["Transaksi"]
+                                    existing_ids = {str(r[0]) for r in ws_t.iter_rows(min_row=2, values_only=True) if r and r[0]}
+                                    for r in src_trxs:
+                                        if r and r[0] and str(r[0]) not in existing_ids:
+                                            ws_t.append(list(r))
+                                            existing_ids.add(str(r[0]))
+
+                                if "Cicilan" in wb_dst.sheetnames:
+                                    ws_c = wb_dst["Cicilan"]
+                                    existing_c_ids = {str(r[0]) for r in ws_c.iter_rows(min_row=2, values_only=True) if r and r[0]}
+                                    for r in src_inst:
+                                        if r and r[0] and str(r[0]) not in existing_c_ids:
+                                            ws_c.append(list(r))
+                                            existing_c_ids.add(str(r[0]))
+
+                                if "Aset_Investasi" in wb_dst.sheetnames:
+                                    ws_a = wb_dst["Aset_Investasi"]
+                                    existing_a_ids = {str(r[0]) for r in ws_a.iter_rows(min_row=2, values_only=True) if r and r[0]}
+                                    for r in src_assets:
+                                        if r and r[0] and str(r[0]) not in existing_a_ids:
+                                            ws_a.append(list(r))
+                                            existing_a_ids.add(str(r[0]))
+
+                                wb_dst.save(canonical_target)
+                                wb_dst.close()
+                            print(f"✅ [Migration] Berhasil menggabungkan data dari {folder.name} ke akun terpadu!")
+                    except Exception as err:
+                        print(f"⚠️ [Migration] Gagal migrasi {folder.name}: {err}")
+    except Exception as e:
+        print(f"⚠️ [Migration] Error saat migrasi data: {e}")
 
 # Web Server Settings
 WEB_HOST = os.getenv("WEB_HOST", "0.0.0.0")
