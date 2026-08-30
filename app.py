@@ -235,7 +235,7 @@ async def google_auth_callback(code: Optional[str] = None, error: Optional[str] 
         ExcelManager(user_id=user_id)
 
         session_token = create_session_token(user_data)
-        response = RedirectResponse(url="/?login=success")
+        response = RedirectResponse(url=f"/?login=success&token={session_token}")
         response.set_cookie(
             key="session_token",
             value=session_token,

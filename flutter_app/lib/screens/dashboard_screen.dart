@@ -52,30 +52,49 @@ class _DashboardScreenState extends State<DashboardScreen> {
           style: TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.w900, fontSize: 18),
         ),
         actions: [
-          // Period Selector Dropdown
+          // Period Selector Dropdown (Month & Year)
           Container(
             margin: const EdgeInsets.only(right: 16),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
             decoration: BoxDecoration(
               color: const Color(0xFFF1F5F9),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: const Color(0xFFE2E8F0)),
             ),
-            child: DropdownButton<int>(
-              value: _selectedMonth,
-              underline: const SizedBox(),
-              icon: const Icon(Icons.keyboard_arrow_down, size: 18, color: Color(0xFF475569)),
-              style: const TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.w700, fontSize: 12),
-              items: List.generate(12, (index) {
-                final m = index + 1;
-                return DropdownMenuItem(value: m, child: Text(_monthNames[m]));
-              }),
-              onChanged: (val) {
-                if (val != null) {
-                  setState(() => _selectedMonth = val);
-                  _loadSummary();
-                }
-              },
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButton<int>(
+                  value: _selectedMonth,
+                  underline: const SizedBox(),
+                  icon: const Icon(Icons.keyboard_arrow_down, size: 16, color: Color(0xFF475569)),
+                  style: const TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.w700, fontSize: 12),
+                  items: List.generate(12, (index) {
+                    final m = index + 1;
+                    return DropdownMenuItem(value: m, child: Text(_monthNames[m]));
+                  }),
+                  onChanged: (val) {
+                    if (val != null) {
+                      setState(() => _selectedMonth = val);
+                      _loadSummary();
+                    }
+                  },
+                ),
+                Container(width: 1, height: 16, color: const Color(0xFFCBD5E1), margin: const EdgeInsets.symmetric(horizontal: 4)),
+                DropdownButton<int>(
+                  value: _selectedYear,
+                  underline: const SizedBox(),
+                  icon: const Icon(Icons.keyboard_arrow_down, size: 16, color: Color(0xFF475569)),
+                  style: const TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.w700, fontSize: 12),
+                  items: [2025, 2026, 2027].map((y) => DropdownMenuItem(value: y, child: Text("$y"))).toList(),
+                  onChanged: (val) {
+                    if (val != null) {
+                      setState(() => _selectedYear = val);
+                      _loadSummary();
+                    }
+                  },
+                ),
+              ],
             ),
           ),
         ],

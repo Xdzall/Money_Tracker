@@ -23,6 +23,12 @@ class AuthService {
     return null;
   }
 
+  static Future<void> saveSession(String token, Map<String, dynamic> user) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_tokenKey, token);
+    await prefs.setString(_userKey, jsonEncode(user));
+  }
+
   static Future<Map<String, String>> getAuthHeaders() async {
     final token = await getToken();
     Map<String, String> headers = {
