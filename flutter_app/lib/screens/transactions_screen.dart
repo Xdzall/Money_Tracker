@@ -65,13 +65,8 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
     }
   }
 
-  void _openAddModal() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _AddTransactionSheet(onSuccess: _loadTransactions),
-    );
+  void _openAddModal([String? type]) {
+    openAddTransactionSheet(context, onSuccess: _loadTransactions, initialType: type);
   }
 
   @override
@@ -263,21 +258,39 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
   }
 }
 
-class _AddTransactionSheet extends StatefulWidget {
-  final VoidCallback onSuccess;
-  const _AddTransactionSheet({required this.onSuccess});
-
-  @override
-  State<_AddTransactionSheet> createState() => _AddTransactionSheetState();
+void openAddTransactionSheet(BuildContext context, {required VoidCallback onSuccess, String? initialType}) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => AddTransactionSheet(onSuccess: onSuccess, initialType: initialType),
+  );
 }
 
-class _AddTransactionSheetState extends State<_AddTransactionSheet> {
+class AddTransactionSheet extends StatefulWidget {
+  final VoidCallback onSuccess;
+  final String? initialType;
+  const AddTransactionSheet({super.key, required this.onSuccess, this.initialType});
+
+  @override
+  State<AddTransactionSheet> createState() => _AddTransactionSheetState();
+}
+
+class _AddTransactionSheetState extends State<AddTransactionSheet> {
   String _tipe = "Pengeluaran";
   final _amountController = TextEditingController();
   final _descController = TextEditingController();
   String _selectedCat = "Makanan & Minuman";
   String _selectedWallet = "BCA";
   bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialType != null) {
+      _tipe = widget.initialType!;
+    }
+  }
 
   final List<String> _incomeCats = ["Gaji", "Investasi / Dividen", "Bonus / THR", "Freelance", "Lainnya"];
   final List<String> _expenseCats = ["Makanan & Minuman", "Transportasi & Bensin", "Belanja Bulanan", "Tagihan & Utilitas", "Cicilan & Hutang", "Lain-lain"];

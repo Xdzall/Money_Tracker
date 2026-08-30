@@ -437,6 +437,11 @@ function setTransactionType(type) {
     populateCategoryDropdowns();
 }
 
+function openTransactionModalWithType(type) {
+    if (type) setTransactionType(type);
+    openModal('modalTransaction');
+}
+
 function debounceSearch() {
     clearTimeout(searchDebounceTimer);
     searchDebounceTimer = setTimeout(loadTransactions, 300);

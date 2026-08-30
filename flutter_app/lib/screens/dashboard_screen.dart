@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/summary_model.dart';
 import '../services/api_service.dart';
+import 'transactions_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -38,6 +39,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _isLoading = false;
       });
     }
+  }
+
+  void _openAddModal([String? type]) {
+    openAddTransactionSheet(context, onSuccess: _loadSummary, initialType: type);
   }
 
   @override
@@ -112,7 +117,43 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   children: [
                     // Main Net Cashflow Banner
                     _buildMainCard(),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
+
+                    // Quick Action Buttons
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () => _openAddModal("Pemasukan"),
+                            icon: const Icon(Icons.add_circle_outline, size: 16),
+                            label: const Text("+ Pemasukan", style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF10B981),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              elevation: 2,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () => _openAddModal("Pengeluaran"),
+                            icon: const Icon(Icons.remove_circle_outline, size: 16),
+                            label: const Text("- Pengeluaran", style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFEF4444),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              elevation: 2,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
 
                     // Income & Expense Grid
                     Row(
