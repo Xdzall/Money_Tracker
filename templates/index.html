@@ -656,40 +656,60 @@
             
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                 
-                <!-- Telegram Bot Setup Card -->
+                <!-- Telegram Bot Setup Card (Personal Multi-User Bot) -->
                 <div class="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200/80 shadow-sm space-y-4">
                     <div class="flex items-center justify-between">
-                        <h3 class="text-base font-extrabold text-slate-900 flex items-center gap-2">
-                            <i data-lucide="send" class="w-5 h-5 text-sky-500"></i>
-                            <span>Hubungkan Telegram Bot</span>
-                        </h3>
-                        <span id="botStatusBadge" class="px-2.5 py-1 text-xs font-bold rounded-full bg-slate-100 text-slate-600">Checking...</span>
+                        <div class="flex items-center space-x-2.5">
+                            <div class="w-9 h-9 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center font-bold shadow-sm">
+                                <i data-lucide="bot" class="w-5 h-5"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-base font-extrabold text-slate-900">Bot Telegram Pribadi</h3>
+                                <p class="text-[11px] text-slate-400 font-medium">Terhubung eksklusif ke spreadsheet akun Anda</p>
+                            </div>
+                        </div>
+                        <span id="userBotStatusBadge" class="px-2.5 py-1 text-[11px] font-extrabold rounded-full bg-slate-100 text-slate-600">Memeriksa...</span>
                     </div>
 
-                    <!-- Direct Bot Config Form -->
-                    <form onsubmit="submitTelegramConfig(event)" class="p-4 bg-sky-50/70 border border-sky-100 rounded-2xl space-y-3">
+                    <!-- Step-by-step Tutorial Accordion -->
+                    <div class="p-3.5 bg-sky-50/60 border border-sky-100 rounded-2xl space-y-2 text-xs text-sky-950">
+                        <p class="font-extrabold text-sky-900 flex items-center gap-1.5">
+                            <i data-lucide="sparkles" class="w-4 h-4 text-sky-600"></i>
+                            <span>Cara Membuat Bot Telegram Gratis (1 Menit):</span>
+                        </p>
+                        <ol class="list-decimal list-inside space-y-1 text-slate-700 text-[11px] font-medium leading-relaxed">
+                            <li>Buka <a href="https://t.me/BotFather" target="_blank" class="text-sky-600 font-bold underline">@BotFather</a> di Telegram $\rightarrow$ ketik <code>/newbot</code> $\rightarrow$ beri nama bot $\rightarrow$ salin <b>HTTP API Token</b>.</li>
+                            <li>Buka <a href="https://t.me/userinfobot" target="_blank" class="text-sky-600 font-bold underline">@userinfobot</a> di Telegram $\rightarrow$ salin <b>Id</b> angka Anda.</li>
+                            <li>Masukkan Token & ID Anda di form bawah, lalu klik <b>Aktifkan Bot</b>.</li>
+                        </ol>
+                    </div>
+
+                    <!-- Bot Configuration Form -->
+                    <form onsubmit="submitUserBotConfig(event)" class="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-3">
                         <div>
-                            <label class="block text-xs font-bold text-sky-950 uppercase tracking-wider mb-1">HTTP API Token (Dari @BotFather)</label>
-                            <input type="text" id="settingBotToken" required placeholder="7123456789:AAFlKj_xxxxxxxx..." class="w-full text-xs font-mono bg-white border border-sky-200 rounded-2xl p-2.5 text-slate-800 focus:ring-2 focus:ring-sky-500">
+                            <label class="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">Bot HTTP API Token</label>
+                            <input type="text" id="userBotTokenInput" required placeholder="Contoh: 7686230505:AAEISz0TU5vwj..." class="w-full text-xs font-mono bg-white border border-slate-200 rounded-2xl p-2.5 text-slate-900 focus:ring-2 focus:ring-sky-500">
                         </div>
                         <div>
-                            <label class="block text-xs font-bold text-sky-950 uppercase tracking-wider mb-1">Telegram User ID (Dari @userinfobot)</label>
-                            <input type="text" id="settingAllowedUsers" placeholder="Kosongkan jika ingin auto-allow" class="w-full text-xs font-mono bg-white border border-sky-200 rounded-2xl p-2.5 text-slate-800 focus:ring-2 focus:ring-sky-500">
+                            <label class="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">Telegram User ID Anda (Otentikasi)</label>
+                            <input type="number" id="userBotTelegramIdInput" placeholder="Contoh: 8004700349 (dari @userinfobot)" class="w-full text-xs font-mono bg-white border border-slate-200 rounded-2xl p-2.5 text-slate-900 focus:ring-2 focus:ring-sky-500">
                         </div>
-                        <button type="submit" class="w-full py-2.5 text-xs font-bold text-white bg-sky-600 hover:bg-sky-700 rounded-2xl shadow-md shadow-sky-600/20 transition">
-                            Simpan Token & Hubungkan Bot
-                        </button>
+                        <div class="flex items-center gap-2 pt-1">
+                            <button type="submit" id="btnSaveUserBot" class="flex-1 py-2.5 text-xs font-extrabold text-white bg-sky-600 hover:bg-sky-700 rounded-2xl shadow-md shadow-sky-600/20 transition active:scale-[0.98]">
+                                Simpan & Aktifkan Bot Pribadi
+                            </button>
+                            <button type="button" onclick="disconnectUserBot()" id="btnDisconnectUserBot" class="hidden px-3.5 py-2.5 text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-2xl transition">
+                                Putuskan
+                            </button>
+                        </div>
                     </form>
 
-                    <div class="p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-2 text-xs text-slate-600">
-                        <p class="font-bold text-slate-800">Contoh Format Pesan ke Bot:</p>
-                        <ul class="list-disc list-inside space-y-1 text-slate-700">
-                            <li><code>tambah cicilan laptop 300 ribu 12 bulan jatuh tempo tanggal 10</code></li>
-                            <li><code>uang masuk saham 500 ribu bca</code></li>
-                            <li><code>pemasukan 1.4 juta seabank</code></li>
-                            <li><code>keluar 50rb makan siang</code></li>
-                            <li><code>/aset</code> & <code>/cicilan</code></li>
-                        </ul>
+                    <div class="p-3 bg-slate-50 border border-slate-200/60 rounded-2xl space-y-1 text-[11px] text-slate-600">
+                        <p class="font-bold text-slate-800">Format Chat yang Didukung Bot Anda:</p>
+                        <p>• <code>pemasukan sebesar 1.4 juta di seabank</code></p>
+                        <p>• <code>cicilan sebesar 103.333 ribu selama 12 bulan jatuh tempo setiap tanggal 10</code></p>
+                        <p>• <code>keluar 50rb makan siang</code></p>
+                        <p>• <code>/rekap</code>, <code>/saldo</code>, <code>/aset</code>, <code>/cicilan</code></p>
                     </div>
                 </div>
 

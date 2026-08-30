@@ -1078,49 +1078,101 @@ async function deleteInstallment(id) {
 // -------------------------------------------------------------
 // BOT STATUS & CONFIG
 // -------------------------------------------------------------
+// USER TELEGRAM BOT CONFIGURATION (Multi-Tenant Bot)
+// -------------------------------------------------------------
 async function checkBotStatus() {
-    try {
-        const res = await fetch("/api/system-info");
-        const json = await res.json();
-        const badge = document.getElementById("botStatusBadge");
-        const tokenInput = document.getElementById("settingBotToken");
-        const allowedInput = document.getElementById("settingAllowedUsers");
-
-        if (json.telegram_bot_configured) {
-            badge.className = "px-2.5 py-1 text-xs font-bold rounded-full bg-emerald-100 text-emerald-800 flex items-center gap-1";
-            badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Bot Terhubung (${json.telegram_bot_token_masked})`;
-            if (tokenInput && !tokenInput.value) {
-                tokenInput.placeholder = `Token aktif: ${json.telegram_bot_token_masked}`;
-            }
-            if (allowedInput && json.allowed_users && json.allowed_users.length > 0) {
-                allowedInput.value = json.allowed_users.join(", ");
-            }
-        } else {
-            badge.className = "px-2.5 py-1 text-xs font-bold rounded-full bg-amber-100 text-amber-800 flex items-center gap-1";
-            badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> Token Belum Diisi`;
-        }
-    } catch (e) {}
+    await loadUserBotConfig();
 }
 
-async function submitTelegramConfig(e) {
-    e.preventDefault();
-    const bot_token = document.getElementById("settingBotToken").value.trim();
-    const allowed_users = document.getElementById("settingAllowedUsers").value.trim();
+async function loadUserBotConfig() {
+    try {
+        const res = await fetch("/api/user/bot-config");
+        if (res.status === 401) return;
+        const json = await res.json();
+        
+        const badge = document.getElementById("userBotStatusBadge");
+        const tokenInput = document.getElementById("userBotTokenInput");
+        const idInput = document.getElementById("userBotTelegramIdInput");
+        const btnSave = document.getElementById("btnSaveUserBot");
+        const btnDisconnect = document.getElementById("btnDisconnectUserBot");
 
-    if (!bot_token) return showToast("Bot Token tidak boleh kosong", "error");
+        if (json.status === "success" && json.data) {
+            const d = json.data;
+            if (d.is_active && (d.is_running || d.bot_token)) {
+                if (badge) {
+                    badge.className = "px-2.5 py-1 text-[11px] font-extrabold rounded-full bg-emerald-100 text-emerald-800 flex items-center gap-1.5";
+                    badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Online 24/7 (${d.bot_token_masked})`;
+                }
+                if (tokenInput && !tokenInput.value) {
+                    tokenInput.placeholder = `Token Aktif: ${d.bot_token_masked}`;
+                }
+                if (idInput && d.telegram_user_id) {
+                    idInput.value = d.telegram_user_id;
+                }
+                if (btnDisconnect) btnDisconnect.classList.remove("hidden");
+                if (btnSave) btnSave.innerText = "Perbarui Pengaturan Bot";
+            } else {
+                if (badge) {
+                    badge.className = "px-2.5 py-1 text-[11px] font-extrabold rounded-full bg-slate-100 text-slate-600 flex items-center gap-1.5";
+                    badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-slate-400"></span> Belum Terhubung`;
+                }
+                if (btnDisconnect) btnDisconnect.classList.add("hidden");
+                if (btnSave) btnSave.innerText = "Simpan & Aktifkan Bot Pribadi";
+            }
+        }
+    } catch (e) {
+        console.error("Error loading user bot config:", e);
+    }
+}
+
+async function submitUserBotConfig(e) {
+    e.preventDefault();
+    const token = document.getElementById("userBotTokenInput").value.trim();
+    const telegram_id_raw = document.getElementById("userBotTelegramIdInput").value.trim();
+    const telegram_user_id = telegram_id_raw ? parseInt(telegram_id_raw) : null;
+
+    if (!token) return showToast("Token Bot Telegram wajib diisi", "error");
+
+    const btnSave = document.getElementById("btnSaveUserBot");
+    const oldText = btnSave.innerText;
+    btnSave.innerText = "Menghubungkan ke Telegram API...";
+    btnSave.disabled = true;
 
     try {
-        const res = await fetch("/api/settings/telegram", {
+        const res = await fetch("/api/user/bot-config", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ bot_token, allowed_users })
+            body: JSON.stringify({ bot_token: token, telegram_user_id })
         });
         const json = await res.json();
         if (json.status === "success") {
-            showToast("Token Bot Telegram berhasil disimpan ke .env!", "success");
-            await checkBotStatus();
+            showToast("Bot Telegram pribadi Anda aktif & terhubung!", "success");
+            document.getElementById("userBotTokenInput").value = "";
+            await loadUserBotConfig();
         } else {
-            showToast(json.detail || "Gagal menyimpan konfigurasi", "error");
+            showToast(json.detail || "Gagal menghubungkan bot", "error");
+        }
+    } catch (e) {
+        showToast("Terjadi kesalahan koneksi", "error");
+    } finally {
+        btnSave.innerText = oldText;
+        btnSave.disabled = false;
+    }
+}
+
+async function disconnectUserBot() {
+    if (!confirm("Apakah Anda yakin ingin memutuskan Bot Telegram pribadi Anda?")) return;
+
+    try {
+        const res = await fetch("/api/user/bot-config/disconnect", { method: "POST" });
+        const json = await res.json();
+        if (json.status === "success") {
+            showToast("Bot Telegram telah diputuskan", "info");
+            document.getElementById("userBotTokenInput").value = "";
+            document.getElementById("userBotTelegramIdInput").value = "";
+            await loadUserBotConfig();
+        } else {
+            showToast(json.detail || "Gagal memutuskan bot", "error");
         }
     } catch (e) {
         showToast("Terjadi kesalahan koneksi", "error");

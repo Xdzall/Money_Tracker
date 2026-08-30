@@ -66,40 +66,23 @@ def get_required_user_em(request: Request) -> ExcelManager:
 def get_user_excel_manager(request: Request) -> ExcelManager:
     return get_required_user_em(request)
 
-# --- Lifespan Context Manager for Telegram Bot 24/7 ---
+from multi_bot_manager import bot_manager
+
+# --- Lifespan Context Manager for Multi-Bot Telegram 24/7 ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    bot_app = None
     config.reload_config()
-    token = config.TELEGRAM_BOT_TOKEN
-    if token:
-        try:
-            print("🤖 [Telegram Bot] Memulai bot polling di background 24/7...")
-            bot_app = create_bot_app()
-            if bot_app:
-                await bot_app.initialize()
-                await bot_app.start()
-                await bot_app.updater.start_polling()
-                print("✅ [Telegram Bot] Bot aktif dan siap menerima pesan!")
-        except Exception as e:
-            print(f"⚠️  [Telegram Bot] Startup error: {e}")
-    else:
-        print("ℹ️  [Telegram Bot] Token belum terpasang.")
+    print("🤖 [MultiBotManager] Memulai bot telegram semua pengguna di background...")
+    await bot_manager.start_all_bots()
     
     yield
     
-    if bot_app:
-        try:
-            print("🛑 [Telegram Bot] Menghentikan bot polling...")
-            await bot_app.updater.stop()
-            await bot_app.stop()
-            await bot_app.shutdown()
-        except Exception as e:
-            print(f"⚠️  [Telegram Bot] Shutdown error: {e}")
+    print("🛑 [MultiBotManager] Menghentikan semua bot telegram...")
+    await bot_manager.stop_all_bots()
 
 app = FastAPI(
     title="Money Tracking App & Multi-User Dashboard",
-    version="2.1.0",
+    version="2.2.0",
     lifespan=lifespan
 )
 
@@ -538,6 +521,45 @@ async def system_info():
         "google_oauth_configured": bool(config.GOOGLE_CLIENT_ID and config.GOOGLE_CLIENT_SECRET),
         "server_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
+
+class UserBotConfigRequest(BaseModel):
+    bot_token: str
+    telegram_user_id: Optional[int] = None
+
+@app.get("/api/user/bot-config")
+async def get_user_bot_status(request: Request):
+    user = get_current_user_from_request(request)
+    if not user or not user.get("id"):
+        raise HTTPException(status_code=401, detail="Harus login terlebih dahulu")
+    data = bot_manager.get_user_bot_config(user["id"])
+    return {"status": "success", "data": data}
+
+@app.post("/api/user/bot-config")
+async def save_user_bot_config_endpoint(req: UserBotConfigRequest, request: Request):
+    user = get_current_user_from_request(request)
+    if not user or not user.get("id"):
+        raise HTTPException(status_code=401, detail="Harus login terlebih dahulu")
+    
+    token = req.bot_token.strip()
+    if not token:
+        raise HTTPException(status_code=400, detail="Token Bot Telegram tidak boleh kosong")
+
+    bot_manager.save_user_bot_config(user["id"], token, req.telegram_user_id)
+    started = await bot_manager.start_user_bot(user["id"], token, req.telegram_user_id)
+    if not started:
+        raise HTTPException(status_code=400, detail="Token bot tidak valid atau gagal terhubung ke Telegram API. Periksa kembali token Anda.")
+    
+    return {"status": "success", "message": "Bot Telegram pribadi Anda berhasil diaktifkan dan berjalan 24/7!"}
+
+@app.post("/api/user/bot-config/disconnect")
+async def disconnect_user_bot_endpoint(request: Request):
+    user = get_current_user_from_request(request)
+    if not user or not user.get("id"):
+        raise HTTPException(status_code=401, detail="Harus login terlebih dahulu")
+    
+    await bot_manager.stop_user_bot(user["id"])
+    bot_manager.delete_user_bot_config(user["id"])
+    return {"status": "success", "message": "Bot Telegram berhasil diputuskan."}
 
 @app.post("/api/settings/telegram")
 async def save_telegram_config(item: TelegramConfigSave):
