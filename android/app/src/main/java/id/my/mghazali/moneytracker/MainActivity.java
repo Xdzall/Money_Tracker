@@ -1,6 +1,7 @@
 package id.my.mghazali.moneytracker;
 
 import android.annotation.SuppressLint;
+import android.app.Activity;
 import android.app.DownloadManager;
 import android.content.Context;
 import android.content.Intent;
@@ -8,12 +9,11 @@ import android.graphics.Bitmap;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.view.KeyEvent;
 import android.view.View;
 import android.webkit.CookieManager;
-import android.webkit.DownloadListener;
 import android.webkit.URLUtil;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
@@ -26,16 +26,11 @@ import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.Toast;
 
-import androidx.activity.OnBackPressedCallback;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
-
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends Activity {
 
     private static final String APP_URL = "https://moneytracker.mghazali.my.id";
 
     private WebView webView;
-    private SwipeRefreshLayout swipeRefresh;
     private ProgressBar progressBar;
     private LinearLayout offlineContainer;
     private Button btnRetry;
@@ -47,14 +42,11 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         webView = findViewById(R.id.webView);
-        swipeRefresh = findViewById(R.id.swipeRefresh);
         progressBar = findViewById(R.id.progressBar);
         offlineContainer = findViewById(R.id.offlineContainer);
         btnRetry = findViewById(R.id.btnRetry);
 
         setupWebView();
-        setupSwipeRefresh();
-        setupBackButton();
 
         btnRetry.setOnClickListener(v -> loadUrl(APP_URL));
 
@@ -108,36 +100,19 @@ public class MainActivity extends AppCompatActivity {
                     Toast.makeText(MainActivity.this, "Mengunduh file: " + filename, Toast.LENGTH_SHORT).show();
                 }
             } catch (Exception e) {
-                // Fallback to external browser
                 Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
                 startActivity(intent);
             }
         });
     }
 
-    private void setupSwipeRefresh() {
-        swipeRefresh.setColorSchemeColors(getResources().getColor(R.color.brand_primary));
-        swipeRefresh.setOnRefreshListener(() -> {
-            if (isNetworkAvailable()) {
-                webView.reload();
-            } else {
-                swipeRefresh.setRefreshing(false);
-                showOfflineView();
-            }
-        });
-    }
-
-    private void setupBackButton() {
-        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
-            @Override
-            public void handleOnBackPressed() {
-                if (webView != null && webView.canGoBack()) {
-                    webView.goBack();
-                } else {
-                    finish();
-                }
-            }
-        });
+    @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if (keyCode == KeyEvent.KEYCODE_BACK && webView != null && webView.canGoBack()) {
+            webView.goBack();
+            return true;
+        }
+        return super.onKeyDown(keyCode, event);
     }
 
     private void loadUrl(String url) {
@@ -160,12 +135,12 @@ public class MainActivity extends AppCompatActivity {
 
     private void showOfflineView() {
         offlineContainer.setVisibility(View.VISIBLE);
-        swipeRefresh.setVisibility(View.GONE);
+        webView.setVisibility(View.GONE);
     }
 
     private void hideOfflineView() {
         offlineContainer.setVisibility(View.GONE);
-        swipeRefresh.setVisibility(View.VISIBLE);
+        webView.setVisibility(View.VISIBLE);
     }
 
     private class CustomWebViewClient extends WebViewClient {
@@ -202,7 +177,6 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void onPageFinished(WebView view, String url) {
             progressBar.setVisibility(View.GONE);
-            swipeRefresh.setRefreshing(false);
         }
 
         @Override
