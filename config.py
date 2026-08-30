@@ -19,11 +19,23 @@ BACKUP_DIR = os.getenv("BACKUP_DIR", str(BASE_DIR / "backups"))
 os.makedirs(USERS_DATA_DIR, exist_ok=True)
 os.makedirs(BACKUP_DIR, exist_ok=True)
 
+def canonical_user_id(user_identifier: str) -> str:
+    """Normalize username or email to standard canonical user ID."""
+    raw = str(user_identifier).strip().lower()
+    if not raw:
+        return "default_user"
+    if "@" not in raw:
+        if raw in ["mghazalinurrahman939", "admin", "mghazali"]:
+            return "mghazalinurrahman939@gmail.com"
+        return f"{raw}@gmail.com"
+    return raw
+
 def sanitize_user_id(user_identifier: str) -> str:
-    """Sanitize email or user ID to safe folder name."""
-    clean = re.sub(r'[^a-zA-Z0-9_\-\.]', '_', str(user_identifier).strip().lower())
+    """Sanitize canonical email or user ID to safe folder name."""
+    canonical = canonical_user_id(user_identifier)
+    clean = re.sub(r'[^a-zA-Z0-9_\-\.]', '_', canonical)
     if len(clean) > 50:
-        hash_suffix = hashlib.md5(user_identifier.encode()).hexdigest()[:8]
+        hash_suffix = hashlib.md5(canonical.encode()).hexdigest()[:8]
         clean = clean[:40] + "_" + hash_suffix
     return clean or "default_user"
 

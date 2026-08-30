@@ -12,7 +12,6 @@ class AuthScreen extends StatefulWidget {
 
 class _AuthScreenState extends State<AuthScreen> {
   final _emailController = TextEditingController();
-  final _nameController = TextEditingController();
   bool _isLoading = false;
   bool _isGoogleLoading = false;
   String? _errorMessage;
@@ -63,7 +62,7 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   void _showQuickGoogleDialog() {
-    final googleEmailController = TextEditingController();
+    final usernameController = TextEditingController(text: "mghazalinurrahman939");
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -97,7 +96,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 const SizedBox(width: 12),
                 const Expanded(
                   child: Text(
-                    "Masuk Akun Google",
+                    "Masuk ke Akun",
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
                   ),
                 ),
@@ -105,20 +104,19 @@ class _AuthScreenState extends State<AuthScreen> {
             ),
             const SizedBox(height: 8),
             const Text(
-              "Masukkan alamat akun Google / Gmail Anda untuk langsung membuka spreadsheet privat.",
+              "Masukkan username atau email akun Anda untuk langsung membuka database spreadsheet privat.",
               style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
             ),
             const SizedBox(height: 20),
             TextField(
-              controller: googleEmailController,
-              keyboardType: TextInputType.emailAddress,
+              controller: usernameController,
               autofocus: true,
               style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
               decoration: InputDecoration(
-                hintText: "nama@gmail.com",
+                hintText: "Contoh: mghazalinurrahman939",
                 filled: true,
                 fillColor: const Color(0xFFF8FAFC),
-                prefixIcon: const Icon(Icons.mail_outline, color: Color(0xFF4F46E5)),
+                prefixIcon: const Icon(Icons.account_circle_outlined, color: Color(0xFF4F46E5)),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
                 enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
                 focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 2)),
@@ -127,11 +125,10 @@ class _AuthScreenState extends State<AuthScreen> {
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: () async {
-                final email = googleEmailController.text.trim();
-                if (email.isEmpty) return;
+                final uname = usernameController.text.trim();
+                if (uname.isEmpty) return;
                 Navigator.pop(ctx);
-                _emailController.text = email;
-                _nameController.text = email.split('@')[0].replaceAll('.', ' ');
+                _emailController.text = uname;
                 _handleLogin();
               },
               style: ElevatedButton.styleFrom(
@@ -140,7 +137,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 15),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               ),
-              child: const Text("Lanjutkan ke Dashboard", style: TextStyle(fontWeight: FontWeight.w800)),
+              child: const Text("Buka Dashboard Saya", style: TextStyle(fontWeight: FontWeight.w800)),
             ),
           ],
         ),
@@ -149,11 +146,10 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Future<void> _handleLogin() async {
-    final email = _emailController.text.trim();
-    final name = _nameController.text.trim();
+    final username = _emailController.text.trim();
 
-    if (email.isEmpty) {
-      setState(() => _errorMessage = "Email / username wajib diisi");
+    if (username.isEmpty) {
+      setState(() => _errorMessage = "Username / Akun wajib diisi");
       return;
     }
 
@@ -162,7 +158,7 @@ class _AuthScreenState extends State<AuthScreen> {
       _errorMessage = null;
     });
 
-    final success = await AuthService.loginDemo(email, name);
+    final success = await AuthService.loginDemo(username, username);
     if (mounted) {
       setState(() => _isLoading = false);
       if (success) {
@@ -302,7 +298,7 @@ class _AuthScreenState extends State<AuthScreen> {
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 12),
                             child: Text(
-                              "ATAU EMAIL PRIVAT",
+                              "ATAU USERNAME AKUN",
                               style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.grey.shade400, letterSpacing: 0.5),
                             ),
                           ),
@@ -327,54 +323,21 @@ class _AuthScreenState extends State<AuthScreen> {
                           ),
                         ),
 
-                      // Email Field
+                      // Username Field
                       const Text(
-                        "EMAIL / USERNAME",
+                        "USERNAME / AKUN",
                         style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF64748B), letterSpacing: 0.5),
                       ),
                       const SizedBox(height: 6),
                       TextField(
                         controller: _emailController,
-                        keyboardType: TextInputType.emailAddress,
                         style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
                         decoration: InputDecoration(
-                          hintText: "nama@email.com atau username",
+                          hintText: "Contoh: mghazalinurrahman939",
                           hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
                           filled: true,
                           fillColor: const Color(0xFFF8FAFC),
-                          prefixIcon: const Icon(Icons.email_outlined, size: 20, color: Color(0xFF64748B)),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 2),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-
-                      // Name Field
-                      const Text(
-                        "NAMA TAMPILAN (OPSIONAL)",
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF64748B), letterSpacing: 0.5),
-                      ),
-                      const SizedBox(height: 6),
-                      TextField(
-                        controller: _nameController,
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
-                        decoration: InputDecoration(
-                          hintText: "Contoh: Muhammad Ghazali",
-                          hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                          filled: true,
-                          fillColor: const Color(0xFFF8FAFC),
-                          prefixIcon: const Icon(Icons.person_outline, size: 20, color: Color(0xFF64748B)),
+                          prefixIcon: const Icon(Icons.account_circle_outlined, size: 20, color: Color(0xFF64748B)),
                           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(16),

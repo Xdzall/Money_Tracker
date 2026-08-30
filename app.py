@@ -219,14 +219,14 @@ async def google_auth_callback(code: Optional[str] = None, error: Optional[str] 
             )
             user_json = user_res.json()
 
-        email = user_json.get("email", "")
-        name = user_json.get("name") or email.split("@")[0]
+        email = user_json.get("email", "").strip().lower()
+        name = user_json.get("name") or (email.split("@")[0] if email else "User")
         picture = user_json.get("picture", "")
-        user_id = user_json.get("id") or email
+        user_id = config.canonical_user_id(email or user_json.get("id"))
 
         user_data = {
             "id": user_id,
-            "email": email,
+            "email": email or user_id,
             "name": name,
             "picture": picture
         }
@@ -251,12 +251,13 @@ async def google_auth_callback(code: Optional[str] = None, error: Optional[str] 
 
 @app.post("/api/auth/demo-login")
 async def demo_login(req: DemoLoginRequest, response: Response):
-    email = req.email.strip().lower()
-    if not email:
-        raise HTTPException(status_code=400, detail="Email harus diisi")
+    raw_ident = req.email.strip()
+    if not raw_ident:
+        raise HTTPException(status_code=400, detail="Username atau email harus diisi")
 
-    name = req.name.strip() or email.split("@")[0].title()
-    user_id = email
+    user_id = config.canonical_user_id(raw_ident)
+    email = user_id
+    name = req.name.strip() or raw_ident.split("@")[0].title()
 
     user_data = {
         "id": user_id,

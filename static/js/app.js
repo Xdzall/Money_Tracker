@@ -1339,9 +1339,10 @@ async function submitGateLogin(e) {
 async function submitDemoLogin(e) {
     e.preventDefault();
     const email = document.getElementById("loginEmailInput").value.trim();
-    const name = document.getElementById("loginNameInput").value.trim();
+    const nameEl = document.getElementById("loginNameInput");
+    const name = nameEl ? nameEl.value.trim() : email;
 
-    if (!email) return showToast("Email harus diisi", "error");
+    if (!email) return showToast("Username atau email harus diisi", "error");
 
     try {
         const res = await fetch("/api/auth/demo-login", {
