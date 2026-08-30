@@ -14,7 +14,7 @@ BACKUP_DIR = os.getenv("BACKUP_DIR", str(BASE_DIR / "backups"))
 
 # Web Server Settings
 WEB_HOST = os.getenv("WEB_HOST", "0.0.0.0")
-WEB_PORT = int(os.getenv("PORT", os.getenv("WEB_PORT", "8000")))
+WEB_PORT = int(os.getenv("PORT", os.getenv("WEB_PORT", "8080")))
 
 # Telegram Bot Settings
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()

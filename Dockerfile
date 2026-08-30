@@ -13,7 +13,7 @@ COPY . .
 RUN mkdir -p backups
 
 # Expose port
-EXPOSE 8000
+EXPOSE 8080 8000
 
 # Run both Web & Telegram bot service
 CMD ["python", "main.py"]
