@@ -54,12 +54,17 @@ def get_current_user_from_request(request: Request) -> Optional[dict]:
         return decode_session_token(token)
     return None
 
-def get_user_excel_manager(request: Request) -> ExcelManager:
+def get_required_user_em(request: Request) -> ExcelManager:
     user = get_current_user_from_request(request)
-    if user and user.get("id"):
-        return ExcelManager(user_id=user["id"])
-    # Fallback to default excel manager
-    return ExcelManager()
+    if not user or not user.get("id"):
+        raise HTTPException(
+            status_code=401,
+            detail="Silakan login terlebih dahulu untuk mengakses data keuangan Anda."
+        )
+    return ExcelManager(user_id=user["id"])
+
+def get_user_excel_manager(request: Request) -> ExcelManager:
+    return get_required_user_em(request)
 
 # --- Lifespan Context Manager for Telegram Bot 24/7 ---
 @asynccontextmanager
@@ -94,7 +99,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Money Tracking App & Multi-User Dashboard",
-    version="2.0.0",
+    version="2.1.0",
     lifespan=lifespan
 )
 
@@ -174,9 +179,7 @@ async def get_google_auth_url(request: Request):
             "google_configured": False
         }
     
-    # Determine base redirect URI
     base_url = config.APP_BASE_URL or str(request.base_url).rstrip("/")
-    # Force https in production if on custom domain
     if "https://" not in base_url and "localhost" not in base_url and "127.0.0.1" not in base_url:
         base_url = base_url.replace("http://", "https://")
 
@@ -327,8 +330,8 @@ async def get_summary(
     month: Optional[int] = Query(None, ge=1, le=12),
     year: Optional[int] = Query(None, ge=2000, le=2100)
 ):
+    em = get_required_user_em(request)
     try:
-        em = get_user_excel_manager(request)
         data = em.get_monthly_summary(month=month, year=year)
         return {"status": "success", "data": data}
     except Exception as e:
@@ -344,8 +347,8 @@ async def list_transactions(
     akun: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
 ):
+    em = get_required_user_em(request)
     try:
-        em = get_user_excel_manager(request)
         transactions = em.get_transactions(
             month=month, year=year, tipe=tipe, kategori=kategori, akun=akun, search=search
         )
@@ -355,8 +358,8 @@ async def list_transactions(
 
 @app.post("/api/transactions")
 async def create_transaction(item: TransactionCreate, request: Request):
+    em = get_required_user_em(request)
     try:
-        em = get_user_excel_manager(request)
         trx = em.add_transaction(
             tanggal=item.tanggal,
             tipe=item.tipe,
@@ -371,7 +374,7 @@ async def create_transaction(item: TransactionCreate, request: Request):
 
 @app.delete("/api/transactions/{trx_id}")
 async def remove_transaction(trx_id: str, request: Request):
-    em = get_user_excel_manager(request)
+    em = get_required_user_em(request)
     success = em.delete_transaction(trx_id)
     if not success:
         raise HTTPException(status_code=404, detail="Transaksi tidak ditemukan")
@@ -380,8 +383,8 @@ async def remove_transaction(trx_id: str, request: Request):
 # --- API Endpoints: Installments / Cicilan ---
 @app.get("/api/installments")
 async def list_installments(request: Request, status: Optional[str] = Query(None)):
+    em = get_required_user_em(request)
     try:
-        em = get_user_excel_manager(request)
         data = em.get_installments(status=status)
         return {"status": "success", "count": len(data), "data": data}
     except Exception as e:
@@ -389,8 +392,8 @@ async def list_installments(request: Request, status: Optional[str] = Query(None
 
 @app.post("/api/installments")
 async def create_installment(item: InstallmentCreate, request: Request):
+    em = get_required_user_em(request)
     try:
-        em = get_user_excel_manager(request)
         res = em.add_installment(
             nama=item.nama,
             penyedia=item.penyedia,
@@ -406,8 +409,8 @@ async def create_installment(item: InstallmentCreate, request: Request):
 
 @app.post("/api/installments/{installment_id}/pay")
 async def pay_installment_endpoint(installment_id: str, req: InstallmentPayRequest, request: Request):
+    em = get_required_user_em(request)
     try:
-        em = get_user_excel_manager(request)
         res = em.pay_installment(
             installment_id=installment_id,
             payment_date=req.payment_date,
@@ -422,7 +425,7 @@ async def pay_installment_endpoint(installment_id: str, req: InstallmentPayReque
 
 @app.delete("/api/installments/{installment_id}")
 async def remove_installment(installment_id: str, request: Request):
-    em = get_user_excel_manager(request)
+    em = get_required_user_em(request)
     success = em.delete_installment(installment_id)
     if not success:
         raise HTTPException(status_code=404, detail="Data cicilan tidak ditemukan")
@@ -431,8 +434,8 @@ async def remove_installment(installment_id: str, request: Request):
 # --- API Endpoints: Assets & Investments (Saham, Crypto, Emas) ---
 @app.get("/api/assets")
 async def list_assets(request: Request, kategori: Optional[str] = Query(None)):
+    em = get_required_user_em(request)
     try:
-        em = get_user_excel_manager(request)
         data = em.get_assets(kategori=kategori)
         return {"status": "success", "count": len(data), "data": data}
     except Exception as e:
@@ -440,8 +443,8 @@ async def list_assets(request: Request, kategori: Optional[str] = Query(None)):
 
 @app.post("/api/assets")
 async def create_asset(item: AssetCreate, request: Request):
+    em = get_required_user_em(request)
     try:
-        em = get_user_excel_manager(request)
         res = em.add_asset(
             nama=item.nama,
             kategori=item.kategori,
@@ -457,8 +460,8 @@ async def create_asset(item: AssetCreate, request: Request):
 
 @app.put("/api/assets/{asset_id}")
 async def update_asset_endpoint(asset_id: str, item: AssetUpdate, request: Request):
+    em = get_required_user_em(request)
     try:
-        em = get_user_excel_manager(request)
         res = em.update_asset(
             asset_id=asset_id,
             nilai_saat_ini=item.nilai_saat_ini,
@@ -474,7 +477,7 @@ async def update_asset_endpoint(asset_id: str, item: AssetUpdate, request: Reque
 
 @app.delete("/api/assets/{asset_id}")
 async def remove_asset(asset_id: str, request: Request):
-    em = get_user_excel_manager(request)
+    em = get_required_user_em(request)
     success = em.delete_asset(asset_id)
     if not success:
         raise HTTPException(status_code=404, detail="Data aset tidak ditemukan")
@@ -483,8 +486,8 @@ async def remove_asset(asset_id: str, request: Request):
 # --- API Endpoints: Master Data & Export ---
 @app.get("/api/master-data")
 async def get_master_data(request: Request):
+    em = get_required_user_em(request)
     try:
-        em = get_user_excel_manager(request)
         data = em.get_master_data()
         return {"status": "success", "data": data}
     except Exception as e:
@@ -492,8 +495,8 @@ async def get_master_data(request: Request):
 
 @app.post("/api/master-data/category")
 async def add_master_category(item: MasterItemCreate, request: Request):
+    em = get_required_user_em(request)
     try:
-        em = get_user_excel_manager(request)
         success = em.add_master_category(type_str=item.tipe or "Pengeluaran", name=item.name)
         if success:
             return {"status": "success", "message": "Kategori berhasil ditambahkan"}
@@ -503,8 +506,8 @@ async def add_master_category(item: MasterItemCreate, request: Request):
 
 @app.post("/api/master-data/wallet")
 async def add_master_wallet(item: MasterItemCreate, request: Request):
+    em = get_required_user_em(request)
     try:
-        em = get_user_excel_manager(request)
         success = em.add_master_wallet(name=item.name)
         if success:
             return {"status": "success", "message": "Akun/Dompet berhasil ditambahkan"}
@@ -514,7 +517,7 @@ async def add_master_wallet(item: MasterItemCreate, request: Request):
 
 @app.get("/api/export")
 async def export_excel(request: Request):
-    em = get_user_excel_manager(request)
+    em = get_required_user_em(request)
     if not os.path.exists(em.file_path):
         raise HTTPException(status_code=404, detail="File Excel belum tersedia")
     return FileResponse(

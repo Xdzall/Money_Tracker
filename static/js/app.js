@@ -1177,16 +1177,18 @@ async function checkAuthStatus() {
         const json = await res.json();
         isGoogleConfigured = json.google_configured;
         
-        const btnGoogle = document.getElementById("btnGoogleOAuth");
         const warningHint = document.getElementById("googleWarningHint");
-        if (warningHint) {
-            if (isGoogleConfigured) {
-                warningHint.classList.add("hidden");
-            } else {
-                warningHint.classList.remove("hidden");
-            }
+        const warningGate = document.getElementById("googleWarningGate");
+        if (isGoogleConfigured) {
+            warningHint?.classList.add("hidden");
+            warningGate?.classList.add("hidden");
+        } else {
+            warningHint?.classList.remove("hidden");
+            warningGate?.classList.remove("hidden");
         }
 
+        const loginGateScreen = document.getElementById("loginGateScreen");
+        const appContainer = document.getElementById("appContainer");
         const btnLoginHeader = document.getElementById("btnLoginHeader");
         const userProfileBadge = document.getElementById("userProfileBadge");
         const userAvatarImg = document.getElementById("userAvatarImg");
@@ -1195,6 +1197,11 @@ async function checkAuthStatus() {
 
         if (json.is_authenticated && json.user) {
             currentUser = json.user;
+            if (loginGateScreen) loginGateScreen.classList.add("hidden");
+            if (appContainer) {
+                appContainer.classList.remove("hidden");
+                appContainer.classList.add("flex");
+            }
             if (btnLoginHeader) btnLoginHeader.classList.add("hidden");
             if (userProfileBadge) {
                 userProfileBadge.classList.remove("hidden");
@@ -1205,6 +1212,14 @@ async function checkAuthStatus() {
             if (userEmailText) userEmailText.innerText = currentUser.email || "-";
         } else {
             currentUser = null;
+            if (loginGateScreen) {
+                loginGateScreen.classList.remove("hidden");
+                loginGateScreen.classList.add("flex");
+            }
+            if (appContainer) {
+                appContainer.classList.add("hidden");
+                appContainer.classList.remove("flex");
+            }
             if (btnLoginHeader) btnLoginHeader.classList.remove("hidden");
             if (userProfileBadge) {
                 userProfileBadge.classList.add("hidden");
@@ -1231,9 +1246,36 @@ async function startGoogleLogin() {
         } else {
             showToast(json.message || "Google OAuth belum dikonfigurasi", "error");
             document.getElementById("googleWarningHint")?.classList.remove("hidden");
+            document.getElementById("googleWarningGate")?.classList.remove("hidden");
         }
     } catch (e) {
         showToast("Gagal memulai login Google", "error");
+    }
+}
+
+async function submitGateLogin(e) {
+    e.preventDefault();
+    const email = document.getElementById("gateEmailInput").value.trim();
+    const name = document.getElementById("gateNameInput").value.trim();
+
+    if (!email) return showToast("Email harus diisi", "error");
+
+    try {
+        const res = await fetch("/api/auth/demo-login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, name })
+        });
+        const json = await res.json();
+        if (json.status === "success") {
+            showToast(`Selamat datang, ${json.user.name}!`, "success");
+            await checkAuthStatus();
+            await refreshAll();
+        } else {
+            showToast(json.detail || "Gagal login", "error");
+        }
+    } catch (e) {
+        showToast("Terjadi kesalahan koneksi", "error");
     }
 }
 
