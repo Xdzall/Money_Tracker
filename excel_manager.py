@@ -83,6 +83,17 @@ class ExcelManager:
     def _ensure_file_and_sheets(self):
         with self.lock:
             needs_init = not os.path.exists(self.file_path)
+            if not needs_init and os.path.exists(config.EXCEL_FILE) and os.path.abspath(self.file_path) != os.path.abspath(config.EXCEL_FILE):
+                try:
+                    wb_chk = openpyxl.load_workbook(self.file_path, data_only=True)
+                    has_trxs = "Transaksi" in wb_chk.sheetnames and wb_chk["Transaksi"].max_row > 1
+                    wb_chk.close()
+                    if not has_trxs:
+                        shutil.copy2(config.EXCEL_FILE, self.file_path)
+                        return
+                except Exception:
+                    pass
+
             if needs_init:
                 os.makedirs(Path(self.file_path).parent, exist_ok=True)
                 if os.path.exists(config.EXCEL_FILE) and os.path.abspath(self.file_path) != os.path.abspath(config.EXCEL_FILE):
