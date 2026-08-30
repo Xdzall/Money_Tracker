@@ -94,6 +94,13 @@ class _InstallmentsScreenState extends State<InstallmentsScreen> {
           "Daftar Cicilan & Hutang",
           style: TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.w900, fontSize: 18),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded, color: Color(0xFF4F46E5)),
+            tooltip: "Segarkan Cicilan",
+            onPressed: _loadInstallments,
+          ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: Color(0xFF4F46E5)))

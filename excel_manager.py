@@ -85,6 +85,12 @@ class ExcelManager:
             needs_init = not os.path.exists(self.file_path)
             if needs_init:
                 os.makedirs(Path(self.file_path).parent, exist_ok=True)
+                if os.path.exists(config.EXCEL_FILE) and os.path.abspath(self.file_path) != os.path.abspath(config.EXCEL_FILE):
+                    try:
+                        shutil.copy2(config.EXCEL_FILE, self.file_path)
+                        return
+                    except Exception:
+                        pass
                 wb = openpyxl.Workbook()
                 if "Sheet" in wb.sheetnames:
                     wb.remove(wb["Sheet"])
