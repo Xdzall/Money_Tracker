@@ -1,8 +1,5 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:url_launcher/url_launcher.dart';
-import '../config/api_config.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../services/auth_service.dart';
 import 'main_navigation_screen.dart';
 
@@ -27,27 +24,38 @@ class _AuthScreenState extends State<AuthScreen> {
     });
 
     try {
-      // Get Google OAuth URL from backend
-      final res = await http.get(Uri.parse(ApiConfig.authGoogleUrl));
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
-        if (data['status'] == 'success' && data['url'] != null) {
-          final authUrl = Uri.parse(data['url']);
-          final launched = await launchUrl(authUrl, mode: LaunchMode.externalApplication);
-          if (!launched) {
-            _showQuickGoogleDialog();
+      final GoogleSignIn googleSignIn = GoogleSignIn(
+        scopes: ['email', 'profile'],
+      );
+
+      // Native Google Account Chooser pop-up
+      final GoogleSignInAccount? account = await googleSignIn.signIn();
+
+      if (account != null) {
+        final email = account.email;
+        final name = account.displayName ?? email.split('@')[0];
+        final picture = account.photoUrl ?? '';
+
+        final success = await AuthService.loginGoogle(
+          email: email,
+          name: name,
+          picture: picture,
+        );
+
+        if (mounted) {
+          if (success) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
+            );
+            return;
           } else {
-            // Show verification dialog when user returns from browser
-            _showAuthConfirmationDialog();
+            setState(() => _errorMessage = "Gagal menyambungkan ke server. Periksa koneksi internet.");
           }
-        } else {
-          // If Google Client ID not yet set on server, offer quick sign-in with Google account email
-          _showQuickGoogleDialog();
         }
-      } else {
-        _showQuickGoogleDialog();
       }
     } catch (e) {
+      print("Google Sign In Native Error: $e");
       _showQuickGoogleDialog();
     } finally {
       if (mounted) setState(() => _isGoogleLoading = false);
@@ -136,54 +144,6 @@ class _AuthScreenState extends State<AuthScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  void _showAuthConfirmationDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: const Row(
-          children: [
-            Icon(Icons.check_circle_outline, color: Color(0xFF10B981)),
-            SizedBox(width: 8),
-            Text("Selesai Login?", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          ],
-        ),
-        content: const Text(
-          "Jika Anda telah berhasil login melalui Google di browser, ketuk 'Periksa Sesi' untuk masuk ke dashboard Anda.",
-          style: TextStyle(fontSize: 13, color: Color(0xFF475569)),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text("Tutup", style: TextStyle(color: Color(0xFF64748B))),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              setState(() => _isLoading = true);
-              final auth = await AuthService.checkAuth();
-              setState(() => _isLoading = false);
-              if (auth['is_authenticated'] == true && mounted) {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
-                );
-              } else {
-                setState(() => _errorMessage = "Sesi belum terdeteksi. Silakan coba login langsung dengan email.");
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF4F46E5),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            child: const Text("Periksa Sesi"),
-          ),
-        ],
       ),
     );
   }

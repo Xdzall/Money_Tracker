@@ -42,6 +42,41 @@ class AuthService {
     return headers;
   }
 
+  static Future<bool> loginGoogle({required String email, String? name, String? picture}) async {
+    try {
+      final res = await http.post(
+        Uri.parse(ApiConfig.authDemoLogin),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "email": email.trim().toLowerCase(),
+          "name": (name != null && name.isNotEmpty) ? name.trim() : email.split('@')[0],
+        }),
+      );
+
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        if (data['status'] == 'success') {
+          final prefs = await SharedPreferences.getInstance();
+          final token = data['token'];
+          if (token != null) {
+            await prefs.setString(_tokenKey, token.toString());
+          }
+          if (data['user'] != null) {
+            final userObj = data['user'] as Map<String, dynamic>;
+            if (picture != null && picture.isNotEmpty) {
+              userObj['picture'] = picture;
+            }
+            await prefs.setString(_userKey, jsonEncode(userObj));
+          }
+          return true;
+        }
+      }
+    } catch (e) {
+      print("Login Google error: $e");
+    }
+    return false;
+  }
+
   static Future<bool> loginDemo(String email, String name) async {
     try {
       final res = await http.post(
