@@ -141,11 +141,14 @@ class MultiBotManager:
         primary_token = config.TELEGRAM_BOT_TOKEN
         primary_user = config.TELEGRAM_PRIMARY_USER_ID or "mghazalinurrahman939@gmail.com"
         if primary_token:
-            await self.start_user_bot(
-                user_id=primary_user,
-                token=primary_token,
-                telegram_user_id=config.ALLOWED_TELEGRAM_USERS[0] if config.ALLOWED_TELEGRAM_USERS else None
-            )
+            try:
+                await self.start_user_bot(
+                    user_id=primary_user,
+                    bot_token=primary_token,
+                    telegram_user_id=config.ALLOWED_TELEGRAM_USERS[0] if config.ALLOWED_TELEGRAM_USERS else None
+                )
+            except Exception as e:
+                logger.error(f"⚠️ [MultiBotManager] Error saat memulai bot utama: {e}")
 
         # 2. Check all user directories for bot_config.json
         if config.USERS_DATA_DIR.exists():
@@ -163,11 +166,11 @@ class MultiBotManager:
                             if b_token and u_id != primary_user:
                                 await self.start_user_bot(
                                     user_id=u_id,
-                                    token=b_token,
+                                    bot_token=b_token,
                                     telegram_user_id=tg_id
                                 )
                         except Exception as e:
-                            logger.error(f"Error loading bot for {user_folder.name}: {e}")
+                            logger.error(f"⚠️ [MultiBotManager] Error loading bot for {user_folder.name}: {e}")
 
     async def stop_all_bots(self):
         """Stop all running bots during server shutdown."""
