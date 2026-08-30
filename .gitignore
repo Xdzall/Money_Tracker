@@ -1,0 +1,17 @@
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# Sensitive Environment Variables
+.env
+
+# Backups
+backups/
