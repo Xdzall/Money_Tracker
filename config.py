@@ -46,6 +46,7 @@ GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "").strip()
 
 # Telegram Bot Settings
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+TELEGRAM_PRIMARY_USER_ID = os.getenv("TELEGRAM_PRIMARY_USER_ID", "mghazalinurrahman939@gmail.com").strip()
 
 def get_allowed_users():
     return [

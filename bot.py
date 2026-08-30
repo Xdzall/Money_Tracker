@@ -23,7 +23,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger("MoneyTrackingBot")
 
-em = ExcelManager()
+def get_bot_em(user_id: Optional[int] = None) -> ExcelManager:
+    """
+    Get ExcelManager mapped to the primary user's private account.
+    """
+    target_user = config.TELEGRAM_PRIMARY_USER_ID or "mghazalinurrahman939@gmail.com"
+    return ExcelManager(user_id=target_user)
 
 # Indonesian Word Numbers Map
 TEXT_NUMS = {
@@ -83,19 +88,18 @@ def extract_amount_and_clean_text(text: str) -> Tuple[float, str]:
     ribu_regex = r"([0-9\.\,]+|se|satu|dua|tiga|empat|lima|enam|tujuh|delapan|sembilan|sepuluh|sebelas)\s*(ribu|rb|k)"
     for m in re.finditer(ribu_regex, s):
         val_raw = m.group(1).replace(",", ".")
-        # If val_raw has dots (like 103.333) and user says '103.333 ribu', handle it gracefully
         if "." in val_raw:
             cleaned_dots = val_raw.replace(".", "").replace(",", "")
             if len(cleaned_dots) >= 4:
                 val = float(cleaned_dots)
-                total += val # Already in thousands
+                total += val
                 matched_spans.append(m.span())
                 continue
         val = TEXT_NUMS.get(val_raw, float(val_raw) if val_raw.replace(".", "").isdigit() else 1.0)
         total += val * 1_000
         matched_spans.append(m.span())
 
-    # 5. Direct plain numbers (e.g. 1.400.000 or 103.333 or 50000)
+    # 5. Direct plain numbers
     if total == 0:
         plain_regex = r"([0-9]+[\.0-9\,]*)"
         for m in re.finditer(plain_regex, s):
@@ -115,16 +119,8 @@ def extract_amount_and_clean_text(text: str) -> Tuple[float, str]:
     return total, cleaned_text
 
 def parse_add_installment(text: str) -> Optional[dict]:
-    """
-    Super flexible installment registration parser:
-    - 'cicilan sebesar 103.333 ribu selama 12 bulan jatuh tempo setiap tanggal 10'
-    - 'tambah cicilan laptop 300 ribu 12 bulan jatuh tempo tanggal 10'
-    - 'tambah cicilan motor beat 750k 24 bulan tempo tgl 15 [FIF]'
-    - 'cicilan konsumsi 562.361 selama 1 bulan tempo tgl 20'
-    """
     text_clean = text.strip()
     
-    # Must contain 'cicilan' and a tenor phrase (e.g. '12 bulan', 'selama 12 bulan', 'tenor 12 bulan')
     if "cicilan" not in text_clean.lower():
         return None
 
@@ -135,8 +131,7 @@ def parse_add_installment(text: str) -> Optional[dict]:
 
     body = text_clean
 
-    # 1. Extract Due Date (e.g. jatuh tempo setiap tanggal 10 / tempo tgl 15 / tgl 20)
-    due_day = 10  # default
+    due_day = 10
     due_match = re.search(r"(?:jatuh\s+tempo|tempo|due|tgl|tanggal)\s*(?:setiap\s+)?(?:tgl|tanggal)?\s*([0-9]{1,2})\b", body, re.IGNORECASE)
     if due_match:
         val = int(due_match.group(1))
@@ -144,16 +139,13 @@ def parse_add_installment(text: str) -> Optional[dict]:
             due_day = val
             body = body[:due_match.start()] + " " + body[due_match.end():]
 
-    # Remove tenor string
     body = body[:tenor_match.start()] + " " + body[tenor_match.end():]
     body = re.sub(r"\s+", " ", body).strip()
 
-    # Extract Amount
     amount, name_and_provider = extract_amount_and_clean_text(body)
     if not amount or amount <= 0 or tenor <= 0:
         return None
 
-    # Clean filler keywords
     name_and_provider = re.sub(r"\b(tambah\s+cicilan|tambah|cicilan|sebesar|sebanyak|senilai|selama|tenor|jatuh tempo|tempo|tanggal|tgl|setiap|di|ke|untuk|buat)\b", "", name_and_provider, flags=re.IGNORECASE).strip()
     name_and_provider = re.sub(r"\s+", " ", name_and_provider).strip()
 
@@ -229,7 +221,6 @@ def parse_text_transaction(
     for aw in action_words:
         cleaned_desc = re.sub(rf"\b{re.escape(aw)}\b", "", cleaned_desc, flags=re.IGNORECASE).strip()
 
-    # Clean prepositions and filler words
     filler_words = ["sebesar", "sebanyak", "senilai", "di", "ke", "dari", "pada", "buat", "untuk", "via", "lewat"]
     for fw in filler_words:
         cleaned_desc = re.sub(rf"\b{re.escape(fw)}\b", "", cleaned_desc, flags=re.IGNORECASE).strip()
@@ -328,14 +319,14 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     welcome_text = (
         f"👋 Halo, *{user.first_name}*!\n\n"
-        f"Selamat datang di *Money Tracker Bot* yang terhubung langsung dengan Web Dashboard & Excel Anda.\n\n"
-        f"📌 *Contoh Format Bebas:*\n"
-        f"• `cicilan sebesar 103.333 ribu selama 12 bulan jatuh tempo setiap tanggal 10`\n"
+        f"Bot Telegram Anda terhubung langsung ke akun privat Google Anda: *{config.TELEGRAM_PRIMARY_USER_ID}*.\n\n"
+        f"📌 *Contoh Format Catat:*\n"
         f"• `pemasukan sebesar 1.4 juta di seabank`\n"
+        f"• `cicilan sebesar 103.333 ribu selama 12 bulan jatuh tempo setiap tanggal 10`\n"
         f"• `uang masuk saham 500 ribu bca`\n"
         f"• `keluar 50rb makan siang`\n\n"
         f"📌 *Perintah Menu:*\n"
-        f"• `/rekap` : Ringkasan bulanan (Pemasukan, Pengeluaran, Cashflow)\n"
+        f"• `/rekap` : Ringkasan bulanan\n"
         f"• `/saldo` : Cek saldo seluruh rekening & dompet\n"
         f"• `/aset` : Cek portofolio saham, crypto & emas\n"
         f"• `/cicilan` : Lihat daftar cicilan & jatuh tempo\n"
@@ -371,9 +362,11 @@ async def cmd_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def cmd_rekap(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_user_allowed(update.effective_user.id):
+    user_id = update.effective_user.id
+    if not is_user_allowed(user_id):
         return
 
+    em = get_bot_em(user_id)
     now = datetime.now()
     summary = em.get_monthly_summary(month=now.month, year=now.year)
     
@@ -405,9 +398,11 @@ async def cmd_rekap(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.callback_query.message.reply_text(rekap_text, parse_mode="Markdown")
 
 async def cmd_saldo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_user_allowed(update.effective_user.id):
+    user_id = update.effective_user.id
+    if not is_user_allowed(user_id):
         return
 
+    em = get_bot_em(user_id)
     summary = em.get_monthly_summary()
     balances = summary.get("wallet_balances", {})
 
@@ -425,9 +420,11 @@ async def cmd_saldo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.callback_query.message.reply_text(saldo_text, parse_mode="Markdown")
 
 async def cmd_aset(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_user_allowed(update.effective_user.id):
+    user_id = update.effective_user.id
+    if not is_user_allowed(user_id):
         return
 
+    em = get_bot_em(user_id)
     assets = em.get_assets()
     if not assets:
         msg = "📈 Belum ada portofolio aset yang tercatat.\nTambahkan aset saham, crypto, atau emas via Web Dashboard."
@@ -467,9 +464,11 @@ async def cmd_aset(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.callback_query.message.reply_text(text, parse_mode="Markdown")
 
 async def cmd_cicilan(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_user_allowed(update.effective_user.id):
+    user_id = update.effective_user.id
+    if not is_user_allowed(user_id):
         return
 
+    em = get_bot_em(user_id)
     installments = em.get_installments(status="Aktif")
     if not installments:
         msg = "🎉 *Selamat!* Tidak ada cicilan aktif saat ini.\nKetik: `cicilan sebesar 103.333 ribu selama 12 bulan jatuh tempo setiap tanggal 10` untuk mendaftarkan cicilan baru."
@@ -505,9 +504,11 @@ async def cmd_cicilan(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.callback_query.message.reply_text(msg, parse_mode="Markdown", reply_markup=reply_markup)
 
 async def cmd_history(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_user_allowed(update.effective_user.id):
+    user_id = update.effective_user.id
+    if not is_user_allowed(user_id):
         return
 
+    em = get_bot_em(user_id)
     trxs = em.get_transactions()[:5]
     if not trxs:
         msg = "Belum ada riwayat transaksi."
@@ -543,6 +544,7 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         )
         return
 
+    em = get_bot_em(user_id)
     text = update.message.text.strip()
 
     # 1. Check if it is an installment registration
@@ -587,8 +589,8 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.message.reply_text(
             "❓ Format pesan belum dikenali.\n\n"
             "Contoh format yang didukung:\n"
-            "• `cicilan sebesar 103.333 ribu selama 12 bulan jatuh tempo setiap tanggal 10`\n"
             "• `pemasukan sebesar 1.4 juta di seabank`\n"
+            "• `cicilan sebesar 103.333 ribu selama 12 bulan jatuh tempo setiap tanggal 10`\n"
             "• `uang masuk saham 500 ribu bca`\n"
             "• `keluar 50rb makan siang`\n\n"
             "Ketik `/help` untuk panduan lengkap.",
@@ -638,13 +640,19 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         f"📅 *Tanggal:* {today_str}"
         f"{installment_note}\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"💾 _Tersimpan di MoneyTracking.xlsx & Dashboard Web!_"
+        f"💾 _Tersimpan di Akun ({config.TELEGRAM_PRIMARY_USER_ID}) & Dashboard Web!_"
     )
     await update.message.reply_text(reply_msg, parse_mode="Markdown")
 
 async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
+    user_id = query.from_user.id
+    if not is_user_allowed(user_id):
+        await query.answer("Akses Ditolak", show_alert=True)
+        return
+
     await query.answer()
+    em = get_bot_em(user_id)
 
     data = query.data
     if data == "btn_rekap":
