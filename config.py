@@ -1,4 +1,6 @@
 import os
+import re
+import hashlib
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -8,13 +10,39 @@ ENV_FILE = BASE_DIR / ".env"
 # Load .env if present
 load_dotenv(ENV_FILE, override=True)
 
-# Excel Settings
+# Excel & Data Storage Settings
+DEFAULT_DATA_DIR = BASE_DIR / "data"
+USERS_DATA_DIR = Path(os.getenv("USERS_DATA_DIR", str(DEFAULT_DATA_DIR / "users")))
 EXCEL_FILE = os.getenv("EXCEL_FILE", str(BASE_DIR / "MoneyTracking.xlsx"))
 BACKUP_DIR = os.getenv("BACKUP_DIR", str(BASE_DIR / "backups"))
+
+os.makedirs(USERS_DATA_DIR, exist_ok=True)
+os.makedirs(BACKUP_DIR, exist_ok=True)
+
+def sanitize_user_id(user_identifier: str) -> str:
+    """Sanitize email or user ID to safe folder name."""
+    clean = re.sub(r'[^a-zA-Z0-9_\-\.]', '_', str(user_identifier).strip().lower())
+    if len(clean) > 50:
+        hash_suffix = hashlib.md5(user_identifier.encode()).hexdigest()[:8]
+        clean = clean[:40] + "_" + hash_suffix
+    return clean or "default_user"
+
+def get_user_excel_path(user_id: str) -> str:
+    """Get isolated Excel file path for a specific user."""
+    safe_uid = sanitize_user_id(user_id)
+    user_folder = USERS_DATA_DIR / safe_uid
+    os.makedirs(user_folder, exist_ok=True)
+    return str(user_folder / "MoneyTracking.xlsx")
 
 # Web Server Settings
 WEB_HOST = os.getenv("WEB_HOST", "0.0.0.0")
 WEB_PORT = int(os.getenv("PORT", os.getenv("WEB_PORT", "8080")))
+APP_BASE_URL = os.getenv("APP_BASE_URL", "").rstrip("/")
+
+# Authentication & Google OAuth 2.0 Settings
+SESSION_SECRET_KEY = os.getenv("SESSION_SECRET_KEY", "money-tracker-super-secret-key-2026-xyz123")
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "").strip()
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "").strip()
 
 # Telegram Bot Settings
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
@@ -30,19 +58,28 @@ ALLOWED_TELEGRAM_USERS = get_allowed_users()
 
 def reload_config():
     global TELEGRAM_BOT_TOKEN, ALLOWED_TELEGRAM_USERS, WEB_HOST, WEB_PORT, EXCEL_FILE
+    global GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, SESSION_SECRET_KEY, APP_BASE_URL
     load_dotenv(ENV_FILE, override=True)
     TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
     ALLOWED_TELEGRAM_USERS = get_allowed_users()
     WEB_HOST = os.getenv("WEB_HOST", "0.0.0.0")
-    WEB_PORT = int(os.getenv("WEB_PORT", "8000"))
+    WEB_PORT = int(os.getenv("PORT", os.getenv("WEB_PORT", "8080")))
     EXCEL_FILE = os.getenv("EXCEL_FILE", str(BASE_DIR / "MoneyTracking.xlsx"))
+    GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "").strip()
+    GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "").strip()
+    SESSION_SECRET_KEY = os.getenv("SESSION_SECRET_KEY", "money-tracker-super-secret-key-2026-xyz123")
+    APP_BASE_URL = os.getenv("APP_BASE_URL", "").rstrip("/")
 
-def save_env_settings(bot_token: str, allowed_users: str = ""):
+def save_env_settings(bot_token: str, allowed_users: str = "", google_client_id: str = "", google_client_secret: str = ""):
     lines = []
     lines.append(f"WEB_HOST={WEB_HOST}\n")
     lines.append(f"WEB_PORT={WEB_PORT}\n")
     lines.append(f"TELEGRAM_BOT_TOKEN={bot_token.strip()}\n")
     lines.append(f"ALLOWED_TELEGRAM_USERS={allowed_users.strip()}\n")
+    lines.append(f"GOOGLE_CLIENT_ID={google_client_id.strip() or GOOGLE_CLIENT_ID}\n")
+    lines.append(f"GOOGLE_CLIENT_SECRET={google_client_secret.strip() or GOOGLE_CLIENT_SECRET}\n")
+    lines.append(f"SESSION_SECRET_KEY={SESSION_SECRET_KEY}\n")
+    lines.append(f"APP_BASE_URL={APP_BASE_URL}\n")
     with open(ENV_FILE, "w", encoding="utf-8") as f:
         f.writelines(lines)
     reload_config()

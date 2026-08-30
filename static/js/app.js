@@ -35,6 +35,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("inputDate").value = new Date().toISOString().split("T")[0];
     document.getElementById("payInstDate").value = new Date().toISOString().split("T")[0];
 
+    await checkAuthStatus();
     await loadMasterData();
     await checkBotStatus();
     await refreshAll();
@@ -1147,6 +1148,7 @@ function closeModal(id) {
 
 function showToast(message, type = "info") {
     const toast = document.getElementById("toast");
+    if (!toast) return;
     toast.innerText = message;
     toast.classList.remove("hidden", "bg-slate-900", "bg-emerald-600", "bg-rose-600", "text-white");
     
@@ -1162,3 +1164,134 @@ function showToast(message, type = "info") {
         toast.classList.add("hidden");
     }, 3500);
 }
+
+// -------------------------------------------------------------
+// AUTHENTICATION & MULTI-USER MANAGEMENT
+// -------------------------------------------------------------
+let currentUser = null;
+let isGoogleConfigured = false;
+
+async function checkAuthStatus() {
+    try {
+        const res = await fetch("/api/auth/me");
+        const json = await res.json();
+        isGoogleConfigured = json.google_configured;
+        
+        const btnGoogle = document.getElementById("btnGoogleOAuth");
+        const warningHint = document.getElementById("googleWarningHint");
+        if (warningHint) {
+            if (isGoogleConfigured) {
+                warningHint.classList.add("hidden");
+            } else {
+                warningHint.classList.remove("hidden");
+            }
+        }
+
+        const btnLoginHeader = document.getElementById("btnLoginHeader");
+        const userProfileBadge = document.getElementById("userProfileBadge");
+        const userAvatarImg = document.getElementById("userAvatarImg");
+        const userNameText = document.getElementById("userNameText");
+        const userEmailText = document.getElementById("userEmailText");
+
+        if (json.is_authenticated && json.user) {
+            currentUser = json.user;
+            if (btnLoginHeader) btnLoginHeader.classList.add("hidden");
+            if (userProfileBadge) {
+                userProfileBadge.classList.remove("hidden");
+                userProfileBadge.classList.add("flex");
+            }
+            if (userAvatarImg) userAvatarImg.src = currentUser.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.name)}&background=4f46e5&color=fff`;
+            if (userNameText) userNameText.innerText = currentUser.name || currentUser.email.split("@")[0];
+            if (userEmailText) userEmailText.innerText = currentUser.email || "-";
+        } else {
+            currentUser = null;
+            if (btnLoginHeader) btnLoginHeader.classList.remove("hidden");
+            if (userProfileBadge) {
+                userProfileBadge.classList.add("hidden");
+                userProfileBadge.classList.remove("flex");
+            }
+        }
+        lucide.createIcons();
+    } catch (e) {
+        console.error("Error checking auth status:", e);
+    }
+}
+
+function openLoginModal() {
+    closeUserDropdown();
+    openModal("modalLogin");
+}
+
+async function startGoogleLogin() {
+    try {
+        const res = await fetch("/api/auth/google/url");
+        const json = await res.json();
+        if (json.status === "success" && json.url) {
+            window.location.href = json.url;
+        } else {
+            showToast(json.message || "Google OAuth belum dikonfigurasi", "error");
+            document.getElementById("googleWarningHint")?.classList.remove("hidden");
+        }
+    } catch (e) {
+        showToast("Gagal memulai login Google", "error");
+    }
+}
+
+async function submitDemoLogin(e) {
+    e.preventDefault();
+    const email = document.getElementById("loginEmailInput").value.trim();
+    const name = document.getElementById("loginNameInput").value.trim();
+
+    if (!email) return showToast("Email harus diisi", "error");
+
+    try {
+        const res = await fetch("/api/auth/demo-login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, name })
+        });
+        const json = await res.json();
+        if (json.status === "success") {
+            showToast(`Selamat datang, ${json.user.name}!`, "success");
+            closeModal("modalLogin");
+            await checkAuthStatus();
+            await refreshAll();
+        } else {
+            showToast(json.detail || "Gagal login", "error");
+        }
+    } catch (e) {
+        showToast("Terjadi kesalahan koneksi", "error");
+    }
+}
+
+async function logout() {
+    closeUserDropdown();
+    if (!confirm("Apakah Anda yakin ingin keluar dari akun ini?")) return;
+
+    try {
+        await fetch("/api/auth/logout", { method: "POST" });
+        showToast("Anda telah keluar", "info");
+        await checkAuthStatus();
+        await refreshAll();
+    } catch (e) {
+        showToast("Gagal logout", "error");
+    }
+}
+
+function toggleUserDropdown() {
+    const menu = document.getElementById("userDropdownMenu");
+    if (menu) menu.classList.toggle("hidden");
+}
+
+function closeUserDropdown() {
+    const menu = document.getElementById("userDropdownMenu");
+    if (menu) menu.classList.add("hidden");
+}
+
+// Close dropdown when clicking outside
+document.addEventListener("click", (e) => {
+    const badge = document.getElementById("userProfileBadge");
+    if (badge && !badge.contains(e.target)) {
+        closeUserDropdown();
+    }
+});
