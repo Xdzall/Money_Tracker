@@ -105,7 +105,7 @@ class _InstallmentsScreenState extends State<InstallmentsScreen> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.check_circle_outline, size: 64, color: Colors.emerald.shade300),
+                          Icon(Icons.check_circle_outline, size: 64, color: Colors.green.shade300),
                           const SizedBox(height: 12),
                           const Text("Tidak ada cicilan aktif saat ini", style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w700)),
                         ],
