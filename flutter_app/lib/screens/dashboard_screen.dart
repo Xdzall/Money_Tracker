@@ -104,6 +104,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ],
       ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _openAddModal(),
+        backgroundColor: const Color(0xFF4F46E5),
+        foregroundColor: Colors.white,
+        elevation: 4,
+        child: const Icon(Icons.add, size: 28),
+      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: Color(0xFF4F46E5)))
           : RefreshIndicator(
@@ -117,43 +124,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   children: [
                     // Main Net Cashflow Banner
                     _buildMainCard(),
-                    const SizedBox(height: 14),
-
-                    // Quick Action Buttons
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: () => _openAddModal("Pemasukan"),
-                            icon: const Icon(Icons.add_circle_outline, size: 16),
-                            label: const Text("+ Pemasukan", style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF10B981),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                              elevation: 2,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: () => _openAddModal("Pengeluaran"),
-                            icon: const Icon(Icons.remove_circle_outline, size: 16),
-                            label: const Text("- Pengeluaran", style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFEF4444),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                              elevation: 2,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 16),
 
                     // Income & Expense Grid
                     Row(
