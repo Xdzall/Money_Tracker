@@ -1,6 +1,9 @@
 import os
+import asyncio
 from datetime import datetime
 from typing import Optional
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -9,8 +12,45 @@ from pydantic import BaseModel, Field
 
 import config
 from excel_manager import ExcelManager
+from bot import create_bot_app
 
-app = FastAPI(title="Money Tracking App & Dashboard", version="1.2.0")
+# --- Lifespan Context Manager for Telegram Bot 24/7 ---
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    bot_app = None
+    config.reload_config()
+    token = config.TELEGRAM_BOT_TOKEN
+    if token:
+        try:
+            print(f"🤖 [Telegram Bot] Memulai bot polling di background 24/7...")
+            bot_app = create_bot_app()
+            if bot_app:
+                await bot_app.initialize()
+                await bot_app.start()
+                await bot_app.updater.start_polling()
+                print("✅ [Telegram Bot] Bot aktif dan siap menerima pesan!")
+        except Exception as e:
+            print(f"⚠️  [Telegram Bot] Startup error: {e}")
+    else:
+        print("ℹ️  [Telegram Bot] Token belum terpasang.")
+    
+    yield
+    
+    # Clean shutdown
+    if bot_app:
+        try:
+            print("🛑 [Telegram Bot] Menghentikan bot polling...")
+            await bot_app.updater.stop()
+            await bot_app.stop()
+            await bot_app.shutdown()
+        except Exception as e:
+            print(f"⚠️  [Telegram Bot] Shutdown error: {e}")
+
+app = FastAPI(
+    title="Money Tracking App & Dashboard",
+    version="1.3.0",
+    lifespan=lifespan
+)
 
 # Setup templates and static files
 templates = Jinja2Templates(directory="templates")

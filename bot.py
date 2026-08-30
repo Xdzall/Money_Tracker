@@ -83,11 +83,19 @@ def extract_amount_and_clean_text(text: str) -> Tuple[float, str]:
     ribu_regex = r"([0-9\.\,]+|se|satu|dua|tiga|empat|lima|enam|tujuh|delapan|sembilan|sepuluh|sebelas)\s*(ribu|rb|k)"
     for m in re.finditer(ribu_regex, s):
         val_raw = m.group(1).replace(",", ".")
+        # If val_raw has dots (like 103.333) and user says '103.333 ribu', handle it gracefully
+        if "." in val_raw:
+            cleaned_dots = val_raw.replace(".", "").replace(",", "")
+            if len(cleaned_dots) >= 4:
+                val = float(cleaned_dots)
+                total += val # Already in thousands
+                matched_spans.append(m.span())
+                continue
         val = TEXT_NUMS.get(val_raw, float(val_raw) if val_raw.replace(".", "").isdigit() else 1.0)
         total += val * 1_000
         matched_spans.append(m.span())
 
-    # 5. Direct plain numbers (e.g. 1.400.000 or 1400000 or 50000)
+    # 5. Direct plain numbers (e.g. 1.400.000 or 103.333 or 50000)
     if total == 0:
         plain_regex = r"([0-9]+[\.0-9\,]*)"
         for m in re.finditer(plain_regex, s):
@@ -108,45 +116,45 @@ def extract_amount_and_clean_text(text: str) -> Tuple[float, str]:
 
 def parse_add_installment(text: str) -> Optional[dict]:
     """
-    Parse natural text for adding installments with due date support:
+    Super flexible installment registration parser:
+    - 'cicilan sebesar 103.333 ribu selama 12 bulan jatuh tempo setiap tanggal 10'
     - 'tambah cicilan laptop 300 ribu 12 bulan jatuh tempo tanggal 10'
     - 'tambah cicilan motor beat 750k 24 bulan tempo tgl 15 [FIF]'
-    - 'tambah cicilan konsumsi 98.439 selama 8 bulan tempo tgl 10'
-    - 'tambah cicilan konsumsi 181.407 1 bulan jatuh tempo 25'
-    - 'tambah cicilan 103.333 12 bulan tempo 15'
+    - 'cicilan konsumsi 562.361 selama 1 bulan tempo tgl 20'
     """
-    text = text.strip()
-    match = re.match(r"^tambah cicilan\s+(.+)$", text, re.IGNORECASE)
-    if not match:
+    text_clean = text.strip()
+    
+    # Must contain 'cicilan' and a tenor phrase (e.g. '12 bulan', 'selama 12 bulan', 'tenor 12 bulan')
+    if "cicilan" not in text_clean.lower():
         return None
-    
-    body = match.group(1).strip()
-    
-    # 1. Extract Due Date (Jatuh tempo tgl X / tempo X / tanggal X / tgl X)
+
+    tenor_match = re.search(r"(?:tenor|selama)?\s*([0-9]+)\s*(?:bln|bulan)\b", text_clean, re.IGNORECASE)
+    if not tenor_match:
+        return None
+    tenor = int(tenor_match.group(1))
+
+    body = text_clean
+
+    # 1. Extract Due Date (e.g. jatuh tempo setiap tanggal 10 / tempo tgl 15 / tgl 20)
     due_day = 10  # default
-    due_match = re.search(r"(?:jatuh\s+tempo|tempo|due|tgl|tanggal)\s*(?:tgl|tanggal)?\s*([0-9]{1,2})\b", body, re.IGNORECASE)
+    due_match = re.search(r"(?:jatuh\s+tempo|tempo|due|tgl|tanggal)\s*(?:setiap\s+)?(?:tgl|tanggal)?\s*([0-9]{1,2})\b", body, re.IGNORECASE)
     if due_match:
         val = int(due_match.group(1))
         if 1 <= val <= 31:
             due_day = val
             body = body[:due_match.start()] + " " + body[due_match.end():]
-            body = re.sub(r"\s+", " ", body).strip()
 
-    # 2. Extract Tenor (e.g. 12 bulan / 12 bln / tenor 12 bulan / selama 12 bulan)
-    tenor = 12
-    tenor_match = re.search(r"(?:tenor|selama)?\s*([0-9]+)\s*(?:bln|bulan)\b", body, re.IGNORECASE)
-    if tenor_match:
-        tenor = int(tenor_match.group(1))
-        body = body[:tenor_match.start()] + " " + body[tenor_match.end():]
-        body = re.sub(r"\s+", " ", body).strip()
+    # Remove tenor string
+    body = body[:tenor_match.start()] + " " + body[tenor_match.end():]
+    body = re.sub(r"\s+", " ", body).strip()
 
-    # 3. Extract Amount
+    # Extract Amount
     amount, name_and_provider = extract_amount_and_clean_text(body)
     if not amount or amount <= 0 or tenor <= 0:
         return None
 
     # Clean filler keywords
-    name_and_provider = re.sub(r"\b(selama|tenor|jatuh tempo|tempo|tanggal|tgl)\b", "", name_and_provider, flags=re.IGNORECASE).strip()
+    name_and_provider = re.sub(r"\b(tambah\s+cicilan|tambah|cicilan|sebesar|sebanyak|senilai|selama|tenor|jatuh tempo|tempo|tanggal|tgl|setiap|di|ke|untuk|buat)\b", "", name_and_provider, flags=re.IGNORECASE).strip()
     name_and_provider = re.sub(r"\s+", " ", name_and_provider).strip()
 
     provider = "Finance / Bank"
@@ -220,6 +228,11 @@ def parse_text_transaction(
     cleaned_desc = rest
     for aw in action_words:
         cleaned_desc = re.sub(rf"\b{re.escape(aw)}\b", "", cleaned_desc, flags=re.IGNORECASE).strip()
+
+    # Clean prepositions and filler words
+    filler_words = ["sebesar", "sebanyak", "senilai", "di", "ke", "dari", "pada", "buat", "untuk", "via", "lewat"]
+    for fw in filler_words:
+        cleaned_desc = re.sub(rf"\b{re.escape(fw)}\b", "", cleaned_desc, flags=re.IGNORECASE).strip()
 
     chosen_wallet = "Cash / Tunai"
     
@@ -315,15 +328,12 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     welcome_text = (
         f"👋 Halo, *{user.first_name}*!\n\n"
-        f"Selamat datang di *Money Tracker Bot* yang terhubung langsung dengan file Excel Anda (`MoneyTracking.xlsx`).\n\n"
-        f"📌 *Contoh Format Tambah Cicilan & Jatuh Tempo:*\n"
-        f"• `tambah cicilan laptop 300 ribu 12 bulan jatuh tempo tanggal 10`\n"
-        f"• `tambah cicilan motor 750k 24 bulan tempo 15 [FIF]`\n\n"
-        f"📌 *Contoh Catat Transaksi Cepat:*\n"
+        f"Selamat datang di *Money Tracker Bot* yang terhubung langsung dengan Web Dashboard & Excel Anda.\n\n"
+        f"📌 *Contoh Format Bebas:*\n"
+        f"• `cicilan sebesar 103.333 ribu selama 12 bulan jatuh tempo setiap tanggal 10`\n"
+        f"• `pemasukan sebesar 1.4 juta di seabank`\n"
         f"• `uang masuk saham 500 ribu bca`\n"
-        f"• `pemasukan 1.4 juta seabank`\n"
-        f"• `keluar 50rb makan siang`\n"
-        f"• `bayar cicilan laptop 300 ribu seabank`\n\n"
+        f"• `keluar 50rb makan siang`\n\n"
         f"📌 *Perintah Menu:*\n"
         f"• `/rekap` : Ringkasan bulanan (Pemasukan, Pengeluaran, Cashflow)\n"
         f"• `/saldo` : Cek saldo seluruh rekening & dompet\n"
@@ -462,7 +472,7 @@ async def cmd_cicilan(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     installments = em.get_installments(status="Aktif")
     if not installments:
-        msg = "🎉 *Selamat!* Tidak ada cicilan aktif saat ini.\nKetik: `tambah cicilan laptop 300 ribu 12 bulan jatuh tempo tanggal 10` untuk mendaftarkan cicilan baru."
+        msg = "🎉 *Selamat!* Tidak ada cicilan aktif saat ini.\nKetik: `cicilan sebesar 103.333 ribu selama 12 bulan jatuh tempo setiap tanggal 10` untuk mendaftarkan cicilan baru."
         if update.message:
             await update.message.reply_text(msg, parse_mode="Markdown")
         elif update.callback_query:
@@ -535,7 +545,7 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     text = update.message.text.strip()
 
-    # 1. Check if it is a 'tambah cicilan' command
+    # 1. Check if it is an installment registration
     add_inst = parse_add_installment(text)
     if add_inst:
         try:
@@ -549,7 +559,7 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                 tgl_jatuh_tempo=add_inst["tgl_jatuh_tempo"]
             )
             msg = (
-                f"✅ *CICILAN BARU BERHASIL DITAMBAHKAN KE EXCEL!*\n"
+                f"✅ *CICILAN BARU BERHASIL DIDAFTARKAN!*\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━\n"
                 f"📌 *Nama Cicilan:* {created_inst['nama']}\n"
                 f"🏦 *Penyedia:* {created_inst['penyedia']}\n"
@@ -558,7 +568,7 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                 f"💰 *Total Pokok Pinjaman:* {format_idr(created_inst['total_pinjaman'])}\n"
                 f"📅 *Jatuh Tempo:* Setiap tanggal *{created_inst['tgl_jatuh_tempo']}*\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"💾 _Tersimpan di Sheet Cicilan. Untuk bayar cicilan tiap bulan, ketik: `bayar cicilan {created_inst['nama']}` atau via `/cicilan`._"
+                f"💾 _Tersimpan di Sheet Cicilan & Dashboard. Untuk bayar cicilan tiap bulan, ketik: `bayar cicilan {created_inst['nama']}` atau via menu `/cicilan`._"
             )
             await update.message.reply_text(msg, parse_mode="Markdown")
             return
@@ -577,10 +587,9 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.message.reply_text(
             "❓ Format pesan belum dikenali.\n\n"
             "Contoh format yang didukung:\n"
-            "• `tambah cicilan laptop 300 ribu 12 bulan jatuh tempo tanggal 10`\n"
-            "• `uang pengeluaran cicilan laptop 300 ribu bca`\n"
+            "• `cicilan sebesar 103.333 ribu selama 12 bulan jatuh tempo setiap tanggal 10`\n"
+            "• `pemasukan sebesar 1.4 juta di seabank`\n"
             "• `uang masuk saham 500 ribu bca`\n"
-            "• `pemasukan 1.4 juta seabank`\n"
             "• `keluar 50rb makan siang`\n\n"
             "Ketik `/help` untuk panduan lengkap.",
             parse_mode="Markdown"
@@ -619,9 +628,8 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
             keterangan=parsed["keterangan"],
         )
 
-    icon = "🟢" if parsed["tipe"] == "Pemasukan" else "🔴"
     reply_msg = (
-        f"✅ *{parsed['tipe'].upper()} BERHASIL DICATAT KE EXCEL!*\n"
+        f"✅ *{parsed['tipe'].upper()} BERHASIL DICATAT!*\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
         f"💵 *Jumlah:* *{format_idr(parsed['jumlah'])}*\n"
         f"🏷 *Kategori:* {parsed['kategori']}\n"
@@ -675,7 +683,7 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
             await query.message.reply_text(f"❌ Gagal memproses cicilan: {str(e)}")
 
 # -------------------------------------------------------------
-# BOT RUNNER
+# BOT FACTORY
 # -------------------------------------------------------------
 def create_bot_app() -> Optional[Application]:
     token = config.TELEGRAM_BOT_TOKEN
