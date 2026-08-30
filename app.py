@@ -522,6 +522,27 @@ async def system_info():
         "server_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
 
+# --- Android App Download Endpoint ---
+@app.get("/download/android")
+@app.get("/api/download/android")
+async def download_android_apk():
+    apk_path = os.path.join("static", "downloads", "MoneyTracker.apk")
+    if os.path.exists(apk_path):
+        return FileResponse(
+            path=apk_path,
+            filename="MoneyTracker.apk",
+            media_type="application/vnd.android.package-archive"
+        )
+    # If APK not yet compiled, provide direct download of the Android project package / guide
+    zip_path = os.path.join("static", "downloads", "MoneyTracker-Android.zip")
+    if os.path.exists(zip_path):
+        return FileResponse(
+            path=zip_path,
+            filename="MoneyTracker-Android.zip",
+            media_type="application/zip"
+        )
+    return RedirectResponse(url="/?download=android")
+
 class UserBotConfigRequest(BaseModel):
     bot_token: str
     telegram_user_id: Optional[int] = None
