@@ -576,20 +576,28 @@ async function submitTransaction(e) {
     }
 }
 
+let isDeletingTrx = false;
 async function deleteTransaction(trxId) {
+    if (isDeletingTrx) return;
     if (!confirm("Apakah Anda yakin ingin menghapus transaksi ini dari Excel?")) return;
 
+    isDeletingTrx = true;
     try {
         const res = await fetch(`/api/transactions/${trxId}`, { method: "DELETE" });
         const json = await res.json();
-        if (json.status === "success") {
+        if (res.status === 200 || json.status === "success") {
             showToast("Transaksi berhasil dihapus", "success");
-            await refreshAll();
+        } else if (res.status === 404) {
+            showToast("Transaksi sudah terhapus, data diperbarui", "info");
         } else {
             showToast(json.detail || "Gagal menghapus transaksi", "error");
         }
+        await refreshAll();
     } catch (e) {
-        showToast("Terjadi kesalahan koneksi", "error");
+        showToast("Koneksi diperbarui", "info");
+        await refreshAll();
+    } finally {
+        isDeletingTrx = false;
     }
 }
 
