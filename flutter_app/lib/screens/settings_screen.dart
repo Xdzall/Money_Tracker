@@ -122,10 +122,170 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  void _showAdminUsersModal() async {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => FutureBuilder<List<Map<String, dynamic>>>(
+        future: ApiService.getAdminUsers(),
+        builder: (ctx, snapshot) {
+          final isLoading = snapshot.connectionState == ConnectionState.waiting;
+          final users = snapshot.data ?? [];
+
+          return Container(
+            height: MediaQuery.of(context).size.height * 0.75,
+            padding: const EdgeInsets.all(20),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      "Pengguna Terdaftar",
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEEF2FF),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        "${users.length} User",
+                        style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF4F46E5), fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  "Daftar akun, email, dan statistik data pengguna",
+                  style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                ),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: isLoading
+                      ? const Center(child: CircularProgressIndicator(color: Color(0xFF4F46E5)))
+                      : users.isEmpty
+                          ? const Center(child: Text("Belum ada pengguna terdaftar."))
+                          : ListView.separated(
+                              itemCount: users.length,
+                              separatorBuilder: (_, __) => const SizedBox(height: 12),
+                              itemBuilder: (ctx, idx) {
+                                final u = users[idx];
+                                final name = u['name'] ?? 'User';
+                                final email = u['email'] ?? u['user_id'] ?? '-';
+                                final trxCount = u['transactions_count'] ?? 0;
+                                final instCount = u['installments_count'] ?? 0;
+                                final hasBot = u['has_telegram_bot'] == true;
+                                final lastSeen = u['last_seen'] ?? '-';
+                                final method = u['login_method'] ?? 'Web / App';
+
+                                return Container(
+                                  padding: const EdgeInsets.all(14),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF8FAFC),
+                                    borderRadius: BorderRadius.circular(18),
+                                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          CircleAvatar(
+                                            radius: 20,
+                                            backgroundColor: const Color(0xFF4F46E5),
+                                            child: Text(
+                                              name.isNotEmpty ? name[0].toUpperCase() : 'U',
+                                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  name,
+                                                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Color(0xFF0F172A)),
+                                                ),
+                                                Text(
+                                                  email,
+                                                  style: const TextStyle(fontSize: 12, color: Color(0xFF4F46E5), fontWeight: FontWeight.w600),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                            decoration: BoxDecoration(
+                                              color: hasBot ? const Color(0xFFECFDF5) : const Color(0xFFF1F5F9),
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                            child: Text(
+                                              hasBot ? "🤖 Bot ON" : "No Bot",
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w700,
+                                                color: hasBot ? const Color(0xFF10B981) : const Color(0xFF64748B),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 10),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text(
+                                            "📊 $trxCount Transaksi • $instCount Cicilan",
+                                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+                                          ),
+                                          Text(
+                                            "Via: $method",
+                                            style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8)),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        "Terakhir aktif: $lastSeen",
+                                        style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8)),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isBotActive = _botConfig != null &&
         (_botConfig!['is_active'] == true || _botConfig!['is_running'] == true || (_botConfig!['bot_token'] != null && _botConfig!['bot_token'].toString().isNotEmpty));
+    final isAdmin = _userProfile?['is_admin'] == true || (_userProfile?['email'] != null && _userProfile!['email'].toString().contains("mghazali"));
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -178,10 +338,66 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ],
                           ),
                         ),
+                        if (isAdmin)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFEF3C7),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Text("👑 Admin", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFFD97706))),
+                          ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 20),
+
+                  // Admin Users Card (Only if Admin)
+                  if (isAdmin) ...[
+                    Container(
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(colors: [Color(0xFF312E81), Color(0xFF4F46E5)]),
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF4F46E5).withOpacity(0.25),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(Icons.admin_panel_settings, color: Colors.white, size: 20),
+                              SizedBox(width: 8),
+                              Text("Panel Admin: Kelola Pengguna", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14)),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          const Text(
+                            "Lihat daftar semua pengguna yang telah mendaftar, email mereka, dan status aktivitasnya.",
+                            style: TextStyle(color: Colors.white70, fontSize: 12),
+                          ),
+                          const SizedBox(height: 12),
+                          ElevatedButton.icon(
+                            onPressed: _showAdminUsersModal,
+                            icon: const Icon(Icons.people_alt, size: 16, color: Color(0xFF4F46E5)),
+                            label: const Text("Lihat Daftar Pengguna Terdaftar", style: TextStyle(color: Color(0xFF4F46E5), fontWeight: FontWeight.w800, fontSize: 12)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
 
                   // Telegram Bot Setup Card
                   Container(

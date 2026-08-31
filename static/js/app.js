@@ -1267,6 +1267,14 @@ async function checkAuthStatus() {
             if (userAvatarImg) userAvatarImg.src = currentUser.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.name)}&background=4f46e5&color=fff`;
             if (userNameText) userNameText.innerText = currentUser.name || currentUser.email.split("@")[0];
             if (userEmailText) userEmailText.innerText = currentUser.email || "-";
+
+            // Check if admin to show admin menu
+            const isAdmin = json.is_admin || (currentUser && (currentUser.email === "mghazalinurrahman939@gmail.com" || currentUser.email.includes("mghazali")));
+            const btnAdmin = document.getElementById("btnAdminUsersMenu");
+            if (btnAdmin) {
+                if (isAdmin) btnAdmin.classList.remove("hidden");
+                else btnAdmin.classList.add("hidden");
+            }
         } else {
             currentUser = null;
             if (loginGateScreen) {
@@ -1287,6 +1295,103 @@ async function checkAuthStatus() {
     } catch (e) {
         console.error("Error checking auth status:", e);
     }
+}
+
+// -------------------------------------------------------------
+// ADMIN USERS MONITORING
+// -------------------------------------------------------------
+let allAdminUsersData = [];
+
+async function openAdminUsersModal() {
+    openModal("modalAdminUsers");
+    const loadingEl = document.getElementById("adminUsersLoading");
+    const listEl = document.getElementById("adminUsersList");
+    const totalBadge = document.getElementById("adminTotalUsersBadge");
+
+    if (loadingEl) loadingEl.classList.remove("hidden");
+    if (listEl) listEl.classList.add("hidden");
+
+    try {
+        const res = await fetch("/api/admin/users");
+        const json = await res.json();
+        if (json.status === "success") {
+            allAdminUsersData = json.data || [];
+            if (totalBadge) totalBadge.innerText = `${allAdminUsersData.length} User`;
+            renderAdminUsersList(allAdminUsersData);
+        } else {
+            showToast(json.detail || "Gagal memuat pengguna", "error");
+        }
+    } catch (e) {
+        showToast("Terjadi kesalahan jaringan", "error");
+    } finally {
+        if (loadingEl) loadingEl.classList.add("hidden");
+        if (listEl) listEl.classList.remove("hidden");
+    }
+}
+
+function renderAdminUsersList(users) {
+    const listEl = document.getElementById("adminUsersList");
+    if (!listEl) return;
+
+    if (!users || users.length === 0) {
+        listEl.innerHTML = `<div class="py-8 text-center text-slate-400 text-xs font-semibold">Tidak ada pengguna ditemukan.</div>`;
+        return;
+    }
+
+    listEl.innerHTML = users.map(u => {
+        const name = u.name || "User";
+        const email = u.email || u.user_id || "-";
+        const pic = u.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=4f46e5&color=fff`;
+        const trx = u.transactions_count || 0;
+        const inst = u.installments_count || 0;
+        const ast = u.assets_count || 0;
+        const botOn = u.has_telegram_bot;
+        const lastSeen = u.last_seen || "-";
+        const method = u.login_method || "Direct";
+
+        return `
+        <div class="p-4 bg-slate-50 hover:bg-slate-100/80 border border-slate-200/80 rounded-2xl transition space-y-2">
+            <div class="flex items-center justify-between gap-3">
+                <div class="flex items-center gap-3">
+                    <img src="${pic}" class="w-10 h-10 rounded-full object-cover border border-white shadow-xs">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h4 class="text-xs font-black text-slate-900">${name}</h4>
+                            <span class="px-2 py-0.5 text-[9px] font-bold rounded-md ${botOn ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}">
+                                ${botOn ? '🤖 Bot Aktif' : 'No Bot'}
+                            </span>
+                        </div>
+                        <p class="text-[11px] font-bold text-brand-600">${email}</p>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <span class="text-[10px] px-2 py-0.5 bg-slate-200/80 text-slate-700 font-semibold rounded-lg">Via: ${method}</span>
+                    <p class="text-[10px] text-slate-400 mt-1">Aktif: ${lastSeen}</p>
+                </div>
+            </div>
+            <div class="pt-2 border-t border-slate-200/60 flex items-center justify-between text-[11px] text-slate-600 font-medium">
+                <span>📊 <b>${trx}</b> Transaksi</span>
+                <span>💳 <b>${inst}</b> Cicilan</span>
+                <span>📈 <b>${ast}</b> Portofolio Aset</span>
+            </div>
+        </div>
+        `;
+    }).join("");
+    lucide.createIcons();
+}
+
+function filterAdminUsersList() {
+    const q = (document.getElementById("adminUserSearchInput")?.value || "").toLowerCase().trim();
+    if (!q) {
+        renderAdminUsersList(allAdminUsersData);
+        return;
+    }
+    const filtered = allAdminUsersData.filter(u => 
+        (u.name && u.name.toLowerCase().includes(q)) || 
+        (u.email && u.email.toLowerCase().includes(q)) ||
+        (u.user_id && u.user_id.toLowerCase().includes(q))
+    );
+    renderAdminUsersList(filtered);
 }
 
 function openLoginModal() {

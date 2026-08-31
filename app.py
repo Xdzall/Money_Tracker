@@ -17,6 +17,13 @@ from pydantic import BaseModel, Field
 import config
 from excel_manager import ExcelManager
 from bot import create_bot_app
+import user_registry
+
+def is_admin_user(user: Optional[dict]) -> bool:
+    if not user or not user.get("id"):
+        return False
+    canonical_id = config.canonical_user_id(user["id"])
+    return canonical_id in ["mghazalinurrahman939@gmail.com", "admin", "mghazali"]
 
 # --- JWT Session Helper ---
 JWT_ALGORITHM = "HS256"
@@ -236,6 +243,15 @@ async def google_auth_callback(code: Optional[str] = None, error: Optional[str] 
         # Initialize user's personal Excel file immediately
         ExcelManager(user_id=user_id)
 
+        # Record user in registry
+        user_registry.record_user_login(
+            user_id=user_id,
+            email=email or user_id,
+            name=name,
+            picture=picture,
+            method="Google OAuth"
+        )
+
         session_token = create_session_token(user_data)
         response = RedirectResponse(url=f"/?login=success&token={session_token}")
         response.set_cookie(
@@ -271,6 +287,15 @@ async def demo_login(req: DemoLoginRequest, response: Response):
     # Initialize user's personal Excel file
     ExcelManager(user_id=user_id)
 
+    # Record user in registry
+    user_registry.record_user_login(
+        user_id=user_id,
+        email=email,
+        name=name,
+        picture=user_data["picture"],
+        method="Email / Username"
+    )
+
     session_token = create_session_token(user_data)
     response.set_cookie(
         key="session_token",
@@ -291,17 +316,36 @@ async def get_current_user_profile(request: Request):
     user = get_current_user_from_request(request)
     google_configured = bool(config.GOOGLE_CLIENT_ID and config.GOOGLE_CLIENT_SECRET)
     if user:
+        is_admin = is_admin_user(user)
+        user["is_admin"] = is_admin
         return {
             "status": "success",
             "is_authenticated": True,
             "user": user,
+            "is_admin": is_admin,
             "google_configured": google_configured
         }
     return {
         "status": "success",
         "is_authenticated": False,
         "user": None,
+        "is_admin": False,
         "google_configured": google_configured
+    }
+
+@app.get("/api/admin/users")
+async def list_registered_users(request: Request):
+    user = get_current_user_from_request(request)
+    if not is_admin_user(user):
+        raise HTTPException(
+            status_code=403,
+            detail="Akses ditolak: Menu ini khusus Administrator."
+        )
+    users = user_registry.get_all_registered_users()
+    return {
+        "status": "success",
+        "total_users": len(users),
+        "data": users
     }
 
 @app.post("/api/auth/logout")

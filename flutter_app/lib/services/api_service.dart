@@ -338,4 +338,24 @@ class ApiService {
     }
     return false;
   }
+
+  // Admin
+  static Future<List<Map<String, dynamic>>> getAdminUsers() async {
+    try {
+      final headers = await AuthService.getAuthHeaders();
+      final res = await http.get(
+        Uri.parse("${ApiConfig.baseUrl}/api/admin/users"),
+        headers: headers,
+      );
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        if (data['status'] == 'success' && data['data'] is List) {
+          return List<Map<String, dynamic>>.from(data['data']);
+        }
+      }
+    } catch (e) {
+      print("Error fetching admin users: $e");
+    }
+    return [];
+  }
 }
